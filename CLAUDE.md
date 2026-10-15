@@ -21,7 +21,7 @@ Work style: fast & terse, write code directly, no long explanations, no unnecess
 ## Deployment
 - Server `119.59.102.161`, only port **3059** open (backend must listen on 3059).
 - Upload via FileZilla SFTP port 2222; run via `ssh std6730202645@119.59.102.161 -p 2222`.
-- Target folder `/app/hr-final`. An OLD project in `/app` currently uses port 3059 — don't touch it.
+- Target folder `/app/std6730202645IPFinal2026`. An OLD project in `/app` currently uses port 3059 — don't touch it.
 - Config via `backend/.env` (see `backend/.env.example`). **Never commit `.env` or real credentials — repo is public.**
 
 ## Submission

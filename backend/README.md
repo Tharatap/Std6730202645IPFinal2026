@@ -41,11 +41,11 @@ npm start                 # node server.js
 ## Deploy ขึ้น server อาจารย์ (119.59.102.161, port 3059)
 
 1. **ฐานข้อมูล (ไม่บังคับ — server สร้างตารางเองได้)**: เปิด phpMyAdmin http://119.59.102.161/nindamdb → เลือก `ip_std6730202645` → Import `sql/schema.sql` แล้วตามด้วย `sql/seed.sql`
-2. **อัปโหลดไฟล์**: FileZilla → SFTP `119.59.102.161` port `2222` → อัปโหลดโฟลเดอร์ `backend/` **โดยไม่เอา `node_modules` และ `.env`** ไปที่ `/app/hr-final/`
+2. **อัปโหลดไฟล์**: FileZilla → SFTP `119.59.102.161` port `2222` → อัปโหลดโฟลเดอร์ `backend/` **โดยไม่เอา `node_modules` และ `.env`** ไปที่ `/app/std6730202645IPFinal2026/`
 3. **ตั้งค่า**:
    ```bash
    ssh std6730202645@119.59.102.161 -p 2222
-   cd /app/hr-final
+   cd /app/std6730202645IPFinal2026
    npm install
    cp .env.example .env
    nano .env        # PORT=3059, DB_HOST=localhost, DB_USER/DB_PASSWORD ของจริง, DB_NAME=ip_std6730202645
