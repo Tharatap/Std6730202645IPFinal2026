@@ -11,7 +11,7 @@ import { colors, fonts, formatDate, MAX_WIDTH, spacing, type, WIDE } from '../th
 
 const AMOUNT_RE = /^\d+(\.\d{1,2})?$/;
 const EMPTY_FORM = { name: '', position: '', salary: '' };
-const NARROW = 420;
+const NARROW = 560; // below this the two toolbar buttons stack
 
 const STATUS_OPTIONS = [
   { label: 'All statuses', value: '' },
