@@ -56,7 +56,7 @@ export default function DialogHost() {
             <View style={styles.dialog} accessibilityRole="alert">
               <View style={styles.eyebrowRow}>
                 <View style={[styles.dot, { backgroundColor: tone.dot }]} />
-                <Text style={[type.label, { color: tone.dot }]}>{eyebrow}</Text>
+                <Text style={[type.label, { color: tone.dot === colors.brass ? colors.inkSoft : tone.dot }]}>{eyebrow}</Text>
               </View>
               <Text style={[type.dialog, styles.title]}>{current.title}</Text>
               {current.message ? <Text style={[type.body, styles.message]}>{current.message}</Text> : null}

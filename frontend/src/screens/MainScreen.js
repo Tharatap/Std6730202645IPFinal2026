@@ -14,7 +14,6 @@ const TABS = [
 
 const TOP_PAD = Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : Platform.OS === 'ios' ? 48 : 0;
 const BOTTOM_PAD = Platform.OS === 'ios' ? 24 : spacing.s2;
-const MIN_ANALYZE_MS = 900; // keep the progress state visible briefly
 
 export default function MainScreen({ token, onLogout }) {
   const { width } = useWindowDimensions();
@@ -41,14 +40,11 @@ export default function MainScreen({ token, onLogout }) {
     setTab('analytics');
     if (analyzing) return;
     setAnalyzing(true);
-    const started = Date.now();
     try {
       const [clusterRes, empRes] = await Promise.all([
         apiRequest('/employees/salary-clusters', { token }),
         apiRequest('/employees', { token }),
       ]);
-      const wait = MIN_ANALYZE_MS - (Date.now() - started);
-      if (wait > 0) await new Promise((r) => setTimeout(r, wait));
       setAnalysis({
         clusters: Array.isArray(clusterRes?.clusters) ? clusterRes.clusters : [],
         employees: Array.isArray(empRes?.data) ? empRes.data : [],

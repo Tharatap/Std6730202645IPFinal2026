@@ -212,14 +212,9 @@ export default function EmployeesScreen({ token, onError, onAnalyze, analyzing, 
   const handleDelete = async (item) => {
     if (busyId) return;
     const ok = await confirmAsync(
-      'Delete employee?',
-      'Are you sure you want to delete this record? This cannot be undone.',
-      {
-        confirmText: 'Delete employee',
-        cancelText: 'Cancel',
-        destructive: true,
-        detail: { name: item.name, position: item.position, salary: item.salary },
-      }
+      'Delete employee',
+      `Are you sure? "${item.name}" (${item.position}) will be permanently deleted.`,
+      { confirmText: 'Delete', cancelText: 'Cancel', destructive: true }
     );
     if (!ok) return;
     setBusyId(item.id);
@@ -410,7 +405,7 @@ export default function EmployeesScreen({ token, onError, onAnalyze, analyzing, 
           <View style={[styles.toolbarButtons, veryNarrow && styles.stack]}>
             <Button title="+ Add Employee" onPress={openAdd} style={!veryNarrow && styles.flex} />
             <Button
-              title="Analyze Salaries"
+              title="Analyze Salary Structure"
               variant="secondary"
               onPress={onAnalyze}
               loading={analyzing}
@@ -547,7 +542,7 @@ export default function EmployeesScreen({ token, onError, onAnalyze, analyzing, 
           variant="dialog"
           value={form.name}
           onChangeText={setField('name')}
-          placeholder="e.g. Chanida Wongsakul"
+          placeholder="Full name"
           error={errors.name}
           editable={!saving}
         />
@@ -556,7 +551,7 @@ export default function EmployeesScreen({ token, onError, onAnalyze, analyzing, 
           variant="dialog"
           value={form.position}
           onChangeText={setField('position')}
-          placeholder="e.g. Payroll Coordinator"
+          placeholder="Job title"
           error={errors.position}
           editable={!saving}
         />

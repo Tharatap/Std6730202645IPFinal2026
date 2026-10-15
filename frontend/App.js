@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ActivityIndicator, Platform, View } from 'react-native';
+import { Platform, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts, Fraunces_300Light, Fraunces_300Light_Italic, Fraunces_400Regular } from '@expo-google-fonts/fraunces';
 import { IBMPlexSans_400Regular, IBMPlexSans_500Medium, IBMPlexSans_600SemiBold } from '@expo-google-fonts/ibm-plex-sans';
@@ -48,13 +48,7 @@ export default function App() {
     setTokenState(value);
   };
 
-  if (!fontsLoaded && !fontError) {
-    return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.paper }}>
-        <ActivityIndicator color={colors.ink} />
-      </View>
-    );
-  }
+  if (!fontsLoaded && !fontError) return null;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.paper }}>

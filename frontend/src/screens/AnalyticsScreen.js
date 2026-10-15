@@ -1,5 +1,4 @@
-import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import Button from '../components/Button';
 import {
   colors,
@@ -15,7 +14,6 @@ import {
 } from '../theme';
 
 const CHART_H = 200;
-const STEPS = ['Normalise salary data', 'Assign employees to clusters', 'Compute tier averages'];
 
 const tierColor = (i) => tierColors[i % tierColors.length];
 const tierName = (i) => tierNames[i] || `Tier ${i + 1}`;
@@ -90,38 +88,16 @@ function BarChart({ clusters, wide }) {
   );
 }
 
-function Progress({ step, wide }) {
+function Loading({ wide }) {
   return (
-    <View style={styles.block}>
-      <Text style={[type.label, { color: colors.brass }]}>Analysis in progress</Text>
-      <Text style={[wide ? type.dialog : type.section, { marginTop: spacing.s2 }]}>Running K-Means clustering…</Text>
-      <Text style={[type.body, { color: colors.muted, marginTop: spacing.s2 }]}>
-        Grouping salaries into 3 tiers. This usually takes a few seconds.
+    <View style={[styles.block, styles.loading]}>
+      <ActivityIndicator size="large" color={colors.ink} />
+      <Text style={[wide ? type.dialog : type.section, styles.center, { marginTop: spacing.s5 }]}>
+        Running K-Means clustering…
       </Text>
-      <View style={styles.track}>
-        <View style={[styles.trackFill, { width: `${((step + 1) / (STEPS.length + 1)) * 100}%` }]} />
-      </View>
-      <View style={styles.steps}>
-        {STEPS.map((s, i) => {
-          const state = i < step ? 'Done' : i === step ? 'In progress' : 'Waiting';
-          const dot = i < step ? colors.success : i === step ? colors.brass : 'transparent';
-          return (
-            <View key={s} style={styles.stepRow}>
-              <Text style={[type.caption, { width: 32 }]}>{String(i + 1).padStart(2, '0')}</Text>
-              <Text style={[i === step ? type.smallMedium : type.small, { flex: 1 }]}>{s}</Text>
-              <View style={[styles.stepDot, { backgroundColor: dot }, i > step && styles.stepDotEmpty]} />
-              <Text style={[type.caption, i === step && { color: colors.ink }]}>{state}</Text>
-            </View>
-          );
-        })}
-      </View>
-      <View style={styles.skeleton}>
-        {[0.7, 0.45, 0.3].map((h, i) => (
-          <View key={i} style={styles.skelCol}>
-            <View style={[styles.skelBar, { height: CHART_H * h }]} />
-          </View>
-        ))}
-      </View>
+      <Text style={[type.body, styles.center, { color: colors.muted, marginTop: spacing.s2 }]}>
+        Grouping salaries into 3 tiers.
+      </Text>
     </View>
   );
 }
@@ -129,27 +105,13 @@ function Progress({ step, wide }) {
 export default function AnalyticsScreen({ analysis, analyzing, onAnalyze }) {
   const { width } = useWindowDimensions();
   const wide = width >= WIDE;
-  const [step, setStep] = useState(0);
-
-  // Decorative step progression while the request is running
-  useEffect(() => {
-    if (!analyzing) return undefined;
-    setStep(0);
-    const t1 = setTimeout(() => setStep(1), 300);
-    const t2 = setTimeout(() => setStep(2), 650);
-    return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-    };
-  }, [analyzing]);
-
   const clusters = analysis?.clusters || [];
   const employees = analysis?.employees || [];
   const pad = wide ? spacing.s10 : spacing.s5;
 
   let content;
   if (analyzing) {
-    content = <Progress step={step} wide={wide} />;
+    content = <Loading wide={wide} />;
   } else if (!analysis) {
     content = (
       <View style={styles.block}>
@@ -303,6 +265,7 @@ const styles = StyleSheet.create({
   headRightNarrow: { alignItems: 'flex-start', alignSelf: 'stretch' },
 
   block: { paddingVertical: spacing.s9 },
+  loading: { alignItems: 'center', paddingVertical: spacing.s12 },
 
   kpis: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.hairline, marginBottom: spacing.s10 },
   kpi: { flex: 1, paddingVertical: spacing.s7, paddingRight: spacing.s4 },
@@ -319,7 +282,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.s6,
   },
   sectionTitle: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.s3 },
-  fig: { color: colors.brass },
+  fig: { color: colors.muted },
 
   plotRow: { flexDirection: 'row' },
   yAxis: { width: 28, justifyContent: 'space-between' },
@@ -350,26 +313,4 @@ const styles = StyleSheet.create({
     borderTopColor: colors.hairlineSoft,
   },
 
-  track: { height: 2, backgroundColor: colors.hairline, marginTop: spacing.s6, maxWidth: 480 },
-  trackFill: { height: 2, backgroundColor: colors.brass },
-  steps: { maxWidth: 480, marginTop: spacing.s5 },
-  stepRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing.s3,
-    borderTopWidth: 1,
-    borderTopColor: colors.hairlineSoft,
-  },
-  stepDot: { width: 6, height: 6, borderRadius: 3, marginRight: spacing.s2 },
-  stepDotEmpty: { borderWidth: 1, borderColor: colors.muted },
-  skeleton: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    height: CHART_H,
-    marginTop: spacing.s10,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.hairline,
-  },
-  skelCol: { flex: 1, alignItems: 'center' },
-  skelBar: { width: '40%', backgroundColor: colors.skeleton },
 });

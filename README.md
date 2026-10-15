@@ -33,6 +33,8 @@ npm install && npx expo start
 ```
 กด `w` เพื่อเปิดบนเว็บ หรือสแกน QR ด้วยแอป Expo Go บนมือถือ
 
+Font ที่ใช้ (Fraunces และ IBM Plex Sans จาก `@expo-google-fonts`) ถูกติดตั้งอัตโนมัติด้วย `npm install` ไม่ต้องตั้งค่าเพิ่ม — ถ้าโหลด font ไม่ได้ แอปจะใช้ font ของระบบแทน
+
 ### ตั้งค่า API_URL
 แก้ที่ไฟล์ **`frontend/src/config.js`**
 - ค่าเริ่มต้น: `http://119.59.102.161:3059/api` (server อาจารย์)

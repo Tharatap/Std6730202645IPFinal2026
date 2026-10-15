@@ -104,5 +104,5 @@ const styles = StyleSheet.create({
   optionSelected: { backgroundColor: colors.paper },
   optionText: { ...type.body, color: colors.ink, flexShrink: 1 },
   optionTextSelected: { fontFamily: type.cell.fontFamily },
-  check: { ...type.smallMedium, color: colors.brass, marginLeft: spacing.s2 },
+  check: { ...type.smallMedium, color: colors.ink, marginLeft: spacing.s2 },
 });

@@ -23,7 +23,6 @@ export function confirmAsync(
   msg,
   { confirmText = 'Delete', cancelText = 'Cancel', destructive = true, eyebrow, detail } = {}
 ) {
-  if (host) return host.confirm({ title, message: msg, confirmText, cancelText, destructive, eyebrow, detail });
   if (Platform.OS === 'web') {
     return Promise.resolve(window.confirm(msg ? `${title}\n\n${msg}` : title));
   }

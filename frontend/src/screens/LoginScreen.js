@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { apiRequest } from '../api';
-import { describeError } from '../alert';
+import { describeError, showAlert } from '../alert';
 import Button from '../components/Button';
 import Input, { ErrorLine } from '../components/Input';
 import { colors, fonts, spacing, type, WIDE } from '../theme';
@@ -24,6 +24,7 @@ export default function LoginScreen({ onLogin }) {
     setFieldErrors(errs);
     if (Object.keys(errs).length) {
       setFormError('Please fill in both username and password.');
+      showAlert('Missing information', 'Please enter both username and password.', { type: 'warning' });
       return;
     }
     setFormError('');
@@ -33,10 +34,13 @@ export default function LoginScreen({ onLogin }) {
       if (!data?.token) throw new Error('Invalid response from server');
       onLogin(data.token);
     } catch (e) {
-      if (e.status === 401) setFormError('Invalid username or password.');
-      else {
+      if (e.status === 401) {
+        setFormError('Invalid username or password.');
+        showAlert('Login failed', 'Invalid username or password.');
+      } else {
         const d = describeError(e, 'Sign in failed');
         setFormError(`${d.title}. ${d.message}`);
+        showAlert(d.title, d.message);
       }
       setLoading(false);
     }
