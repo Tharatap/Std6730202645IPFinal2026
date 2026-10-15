@@ -212,9 +212,14 @@ export default function EmployeesScreen({ token, onError, onAnalyze, analyzing, 
   const handleDelete = async (item) => {
     if (busyId) return;
     const ok = await confirmAsync(
-      'Delete employee',
-      `Are you sure? "${item.name}" (${item.position}) will be permanently deleted.`,
-      { confirmText: 'Delete', cancelText: 'Cancel', destructive: true }
+      'Delete employee?',
+      'Are you sure? This record will be permanently deleted and cannot be undone.',
+      {
+        confirmText: 'Delete employee',
+        cancelText: 'Cancel',
+        destructive: true,
+        detail: { name: item.name, position: item.position, salary: item.salary },
+      }
     );
     if (!ok) return;
     setBusyId(item.id);
