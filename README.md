@@ -14,7 +14,7 @@ npm install
 cp .env.example .env   # แก้ DB_USER, DB_PASSWORD, DB_NAME ให้ตรงกับ MySQL ของเครื่อง (PORT=3000)
 npm start              # node server.js
 ```
-- Server สร้างตาราง `Tharatap_employees` และใส่ข้อมูลตัวอย่าง 8 คนให้อัตโนมัติ (เฉพาะเมื่อตารางว่าง)
+- Server สร้างตาราง `Tharatap_employees_final_exam` และใส่ข้อมูลตัวอย่าง 8 คนให้อัตโนมัติ (เฉพาะเมื่อตารางว่าง)
 - หรือ import เองใน phpMyAdmin: `backend/sql/schema.sql` แล้ว `backend/sql/seed.sql`
 - ทดสอบ: `curl http://localhost:3000/api/health` → `{"ok":true}`
 

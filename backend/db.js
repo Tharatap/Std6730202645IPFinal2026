@@ -10,7 +10,7 @@ const pool = mysql.createPool({
   charset: 'utf8mb4_unicode_ci',
 });
 
-const CREATE_TABLE_SQL = `CREATE TABLE IF NOT EXISTS Tharatap_employees (
+const CREATE_TABLE_SQL = `CREATE TABLE IF NOT EXISTS Tharatap_employees_final_exam (
   Tharatap_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   Tharatap_name VARCHAR(100) NOT NULL,
   Tharatap_position VARCHAR(100) NOT NULL,
@@ -33,11 +33,11 @@ const SEED = [
 
 async function initDb() {
   await pool.execute(CREATE_TABLE_SQL);
-  const [rows] = await pool.execute('SELECT COUNT(*) AS c FROM Tharatap_employees');
+  const [rows] = await pool.execute('SELECT COUNT(*) AS c FROM Tharatap_employees_final_exam');
   if (Number(rows[0].c) > 0) return false;
   for (const row of SEED) {
     await pool.execute(
-      'INSERT INTO Tharatap_employees (Tharatap_name, Tharatap_position, Tharatap_status, Tharatap_salary) VALUES (?, ?, ?, ?)',
+      'INSERT INTO Tharatap_employees_final_exam (Tharatap_name, Tharatap_position, Tharatap_status, Tharatap_salary) VALUES (?, ?, ?, ?)',
       row
     );
   }

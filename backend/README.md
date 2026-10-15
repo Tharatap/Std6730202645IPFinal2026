@@ -11,7 +11,7 @@ cp .env.example .env      # แล้วแก้ DB_USER / DB_PASSWORD / DB_NAM
 npm start                 # node server.js
 ```
 
-- ตอนเริ่ม server จะสร้างตาราง `Tharatap_employees` ให้อัตโนมัติ (`CREATE TABLE IF NOT EXISTS`) และใส่ข้อมูลตัวอย่าง 8 คน **เฉพาะเมื่อตารางว่าง**
+- ตอนเริ่ม server จะสร้างตาราง `Tharatap_employees_final_exam` ให้อัตโนมัติ (`CREATE TABLE IF NOT EXISTS`) และใส่ข้อมูลตัวอย่าง 8 คน **เฉพาะเมื่อตารางว่าง**
 - ถ้าไม่มี `PORT` ใน `.env` server จะหยุดทำงานทันที (exit 1)
 - ทดสอบ: `curl http://localhost:3000/api/health` → `{"ok":true}`
 
@@ -37,7 +37,7 @@ npm start                 # node server.js
 
 ## ฐานข้อมูล
 
-ตาราง `Tharatap_employees` (ชื่อตารางและทุกคอลัมน์ขึ้นต้นด้วย `Tharatap_` ตามข้อกำหนด) — ดู `sql/schema.sql`, ข้อมูลตัวอย่าง `sql/seed.sql`
+ตาราง `Tharatap_employees_final_exam` (ชื่อตารางและทุกคอลัมน์ขึ้นต้นด้วย `Tharatap_` ตามข้อกำหนด) — ดู `sql/schema.sql`, ข้อมูลตัวอย่าง `sql/seed.sql`
 ไม่ใช้ FOREIGN KEY / TRUNCATE / DROP / CREATE DATABASE (สิทธิ์ไม่พอบน server)
 
 ## Deploy ขึ้น server อาจารย์ (119.59.102.161, port 3059)

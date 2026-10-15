@@ -4,7 +4,7 @@ SET NAMES utf8mb4;
 -- CREATE DATABASE IF NOT EXISTS ip_std6730202645 CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 -- USE ip_std6730202645;
 
-CREATE TABLE IF NOT EXISTS Tharatap_employees (
+CREATE TABLE IF NOT EXISTS Tharatap_employees_final_exam (
   Tharatap_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   Tharatap_name VARCHAR(100) NOT NULL,
   Tharatap_position VARCHAR(100) NOT NULL,

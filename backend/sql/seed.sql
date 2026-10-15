@@ -1,9 +1,9 @@
 SET NAMES utf8mb4;
 
--- Only touches Tharatap_employees (DB is shared with another project). No TRUNCATE allowed.
-DELETE FROM Tharatap_employees;
+-- Only touches Tharatap_employees_final_exam (DB is shared with another project). No TRUNCATE allowed.
+DELETE FROM Tharatap_employees_final_exam;
 
-INSERT INTO Tharatap_employees (Tharatap_name, Tharatap_position, Tharatap_status, Tharatap_salary) VALUES
+INSERT INTO Tharatap_employees_final_exam (Tharatap_name, Tharatap_position, Tharatap_status, Tharatap_salary) VALUES
 ('Somchai Jaidee', 'Junior Developer', 'Active', 15000.00),
 ('Suda Rakdee', 'HR Assistant', 'On Leave', 18000.00),
 ('Anan Srisuk', 'Support Engineer', 'Active', 22000.00),

@@ -16,7 +16,7 @@ Work style: fast & terse, write code directly, no long explanations, no unnecess
 ## Database (MySQL, shared w/ old project)
 - DB `ip_std6730202645`, `DB_HOST=localhost` (same server), managed via phpMyAdmin. utf8mb4.
 - Limited privileges: **no FOREIGN KEY, no TRUNCATE, no CREATE DATABASE, no DROP**.
-- **Naming rule: table name AND every column must start with `Tharatap_`** (e.g. `Tharatap_employees`, `Tharatap_id`, `Tharatap_salary`).
+- **Naming rule: table name AND every column must start with `Tharatap_`** (e.g. `Tharatap_employees_final_exam`, `Tharatap_id`, `Tharatap_salary`).
 
 ## Deployment
 - Server `119.59.102.161`, only port **3059** open (backend must listen on 3059).

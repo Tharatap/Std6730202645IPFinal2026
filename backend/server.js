@@ -108,7 +108,7 @@ app.get('/api/employees', asyncHandler(async (req, res) => {
   }
 
   const [rows] = await pool.execute(
-    `SELECT ${SELECT_COLS} FROM Tharatap_employees
+    `SELECT ${SELECT_COLS} FROM Tharatap_employees_final_exam
      ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
      ORDER BY Tharatap_id ASC`,
     params
@@ -118,7 +118,7 @@ app.get('/api/employees', asyncHandler(async (req, res) => {
 
 // Must be before /:id routes
 app.get('/api/employees/salary-clusters', asyncHandler(async (req, res) => {
-  const [rows] = await pool.execute('SELECT Tharatap_salary FROM Tharatap_employees');
+  const [rows] = await pool.execute('SELECT Tharatap_salary FROM Tharatap_employees_final_exam');
   res.json({ success: true, clusters: salaryClusters(rows.map((r) => Number(r.Tharatap_salary)), 3) });
 }));
 
@@ -142,10 +142,10 @@ app.post('/api/employees', asyncHandler(async (req, res) => {
   if (error) return res.status(400).json({ success: false, message: error });
 
   const [result] = await pool.execute(
-    'INSERT INTO Tharatap_employees (Tharatap_name, Tharatap_position, Tharatap_salary) VALUES (?, ?, ?)',
+    'INSERT INTO Tharatap_employees_final_exam (Tharatap_name, Tharatap_position, Tharatap_salary) VALUES (?, ?, ?)',
     [value.name, value.position, value.salary]
   );
-  const [rows] = await pool.execute(`SELECT ${SELECT_COLS} FROM Tharatap_employees WHERE Tharatap_id = ?`, [result.insertId]);
+  const [rows] = await pool.execute(`SELECT ${SELECT_COLS} FROM Tharatap_employees_final_exam WHERE Tharatap_id = ?`, [result.insertId]);
   res.status(201).json({ success: true, data: toEmployee(rows[0]) });
 }));
 
@@ -156,11 +156,11 @@ app.put('/api/employees/:id', asyncHandler(async (req, res) => {
   if (error) return res.status(400).json({ success: false, message: error });
 
   await pool.execute(
-    'UPDATE Tharatap_employees SET Tharatap_name = ?, Tharatap_position = ?, Tharatap_salary = ? WHERE Tharatap_id = ?',
+    'UPDATE Tharatap_employees_final_exam SET Tharatap_name = ?, Tharatap_position = ?, Tharatap_salary = ? WHERE Tharatap_id = ?',
     [value.name, value.position, value.salary, id]
   );
   // affectedRows is 0 when values are unchanged, so check existence via SELECT
-  const [rows] = await pool.execute(`SELECT ${SELECT_COLS} FROM Tharatap_employees WHERE Tharatap_id = ?`, [id]);
+  const [rows] = await pool.execute(`SELECT ${SELECT_COLS} FROM Tharatap_employees_final_exam WHERE Tharatap_id = ?`, [id]);
   if (!rows.length) return res.status(404).json({ success: false, message: 'Employee not found' });
   res.json({ success: true, data: toEmployee(rows[0]) });
 }));
@@ -170,12 +170,12 @@ app.put('/api/employees/:id/status', asyncHandler(async (req, res) => {
   if (id === null) return res.status(404).json({ success: false, message: 'Employee not found' });
 
   const [result] = await pool.execute(
-    "UPDATE Tharatap_employees SET Tharatap_status = IF(Tharatap_status = 'Active', 'On Leave', 'Active') WHERE Tharatap_id = ?",
+    "UPDATE Tharatap_employees_final_exam SET Tharatap_status = IF(Tharatap_status = 'Active', 'On Leave', 'Active') WHERE Tharatap_id = ?",
     [id]
   );
   if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Employee not found' });
 
-  const [rows] = await pool.execute(`SELECT ${SELECT_COLS} FROM Tharatap_employees WHERE Tharatap_id = ?`, [id]);
+  const [rows] = await pool.execute(`SELECT ${SELECT_COLS} FROM Tharatap_employees_final_exam WHERE Tharatap_id = ?`, [id]);
   res.json({ success: true, data: toEmployee(rows[0]) });
 }));
 
@@ -183,7 +183,7 @@ app.delete('/api/employees/:id', asyncHandler(async (req, res) => {
   const id = parseId(req.params.id);
   if (id === null) return res.status(404).json({ success: false, message: 'Employee not found' });
 
-  const [result] = await pool.execute('DELETE FROM Tharatap_employees WHERE Tharatap_id = ?', [id]);
+  const [result] = await pool.execute('DELETE FROM Tharatap_employees_final_exam WHERE Tharatap_id = ?', [id]);
   if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Employee not found' });
   res.json({ success: true, message: 'Employee deleted successfully' });
 }));
