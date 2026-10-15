@@ -116,6 +116,7 @@ export default function DashboardScreen({ token, onLogout }) {
       setName('');
       setPosition('');
       setSalary('');
+      setClusters(null); // salaries changed → old analysis is stale
       await fetchEmployees();
     } catch (e) {
       handleError(e, 'Add Failed');
@@ -144,6 +145,7 @@ export default function DashboardScreen({ token, onLogout }) {
     setBusyId(id);
     try {
       await apiRequest(`/employees/${encodeURIComponent(id)}`, { method: 'DELETE', token });
+      setClusters(null);
       await fetchEmployees();
     } catch (e) {
       handleError(e, 'Delete Failed');
