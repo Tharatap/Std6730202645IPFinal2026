@@ -1,26 +1,37 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
-import { colors, radius, spacing } from '../theme';
+import { colors, radius, spacing, type } from '../theme';
 
+// primary = ink solid · secondary = outlined · danger = red solid · link / linkDanger = underlined text
 const VARIANTS = {
-  primary: { bg: colors.primary, pressed: colors.primaryLight, fg: colors.textInverse, border: colors.primary },
-  secondary: { bg: colors.secondaryBg, pressed: colors.border, fg: colors.primary, border: colors.secondaryBg },
-  danger: { bg: colors.dangerBg, pressed: colors.dangerPressed, fg: colors.danger, border: colors.dangerBg },
-  dangerSolid: { bg: colors.danger, pressed: colors.dangerDark, fg: colors.textInverse, border: colors.danger },
-  ghost: { bg: 'transparent', pressed: colors.ghostPressed, fg: colors.primary, border: colors.border },
+  primary: { bg: colors.ink, pressed: colors.inkSoft, fg: colors.white, border: colors.ink },
+  secondary: { bg: 'transparent', pressed: colors.hairlineSoft, fg: colors.ink, border: colors.ink },
+  danger: { bg: colors.danger, pressed: colors.dangerPressed, fg: colors.white, border: colors.danger },
 };
 
-export default function Button({
-  title,
-  onPress,
-  variant = 'primary',
-  size = 'md',
-  loading = false,
-  disabled = false,
-  style,
-  textStyle,
-}) {
-  const v = VARIANTS[variant] || VARIANTS.primary;
+export default function Button({ title, onPress, variant = 'primary', loading = false, disabled = false, loadingTitle, style }) {
   const inactive = disabled || loading;
+
+  if (variant === 'link' || variant === 'linkDanger') {
+    const danger = variant === 'linkDanger';
+    return (
+      <Pressable onPress={onPress} disabled={inactive} hitSlop={6} accessibilityRole="button" style={style}>
+        {({ pressed }) => (
+          <Text
+            style={[
+              styles.link,
+              { color: danger ? colors.danger : colors.ink, textDecorationColor: danger ? colors.danger : colors.fieldBorder },
+              (pressed || inactive) && styles.faded,
+            ]}
+          >
+            {loading && loadingTitle ? loadingTitle : title}
+          </Text>
+        )}
+      </Pressable>
+    );
+  }
+
+  const v = VARIANTS[variant] || VARIANTS.primary;
+  const greyed = loading && !!loadingTitle; // design: "Analyzing…" greyed button
   return (
     <Pressable
       onPress={onPress}
@@ -28,16 +39,16 @@ export default function Button({
       accessibilityRole="button"
       style={({ pressed }) => [
         styles.base,
-        size === 'sm' && styles.sm,
         { backgroundColor: pressed ? v.pressed : v.bg, borderColor: v.border },
-        inactive && styles.inactive,
+        greyed && styles.greyed,
+        inactive && !greyed && styles.faded,
         style,
       ]}
     >
-      {loading ? (
+      {loading && !loadingTitle ? (
         <ActivityIndicator size="small" color={v.fg} />
       ) : (
-        <Text style={[styles.text, size === 'sm' && styles.textSm, { color: v.fg }, textStyle]}>{title}</Text>
+        <Text style={[type.button, { color: greyed ? colors.white : v.fg }]}>{greyed ? loadingTitle : title}</Text>
       )}
     </Pressable>
   );
@@ -45,15 +56,14 @@ export default function Button({
 
 const styles = StyleSheet.create({
   base: {
-    minHeight: 40,
-    paddingHorizontal: spacing.lg,
+    minHeight: 46,
+    paddingHorizontal: spacing.s6,
     borderRadius: radius.control,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sm: { minHeight: 32, paddingHorizontal: spacing.md },
-  inactive: { opacity: 0.55 },
-  text: { fontSize: 14, fontWeight: '600' },
-  textSm: { fontSize: 13 },
+  greyed: { backgroundColor: colors.muted, borderColor: colors.muted, opacity: 0.75 },
+  faded: { opacity: 0.5 },
+  link: { ...type.smallMedium, textDecorationLine: 'underline' },
 });

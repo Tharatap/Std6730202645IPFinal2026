@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { colors, radius, shadow, spacing, type } from '../theme';
+import { colors, radius, spacing, type } from '../theme';
 
-// Filter pill that opens a selectable list. options: [{ label, value }]
+// Filter control that opens a selectable list. options: [{ label, value }]
 export default function Dropdown({ title, label, active, options, value, onSelect, onClear }) {
   const [open, setOpen] = useState(false);
 
@@ -31,7 +31,7 @@ export default function Dropdown({ title, label, active, options, value, onSelec
         <View style={styles.overlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpen(false)} />
           <View style={styles.sheet}>
-            <Text style={[type.caption, styles.sheetTitle]}>{title}</Text>
+            <Text style={[type.label, styles.sheetTitle]}>{title}</Text>
             <ScrollView style={{ maxHeight: 360 }}>
               {options.map((opt) => {
                 const selected = opt.value === value;
@@ -61,51 +61,48 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.fieldBorder,
     backgroundColor: colors.surface,
-    borderRadius: radius.pill,
-    maxWidth: 260,
+    borderRadius: radius.control,
+    maxWidth: 280,
   },
-  pillActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  pillActive: { backgroundColor: colors.ink, borderColor: colors.ink },
   pillMain: {
     flexDirection: 'row',
     alignItems: 'center',
     flexShrink: 1,
-    paddingLeft: spacing.md,
-    paddingRight: spacing.sm,
-    paddingVertical: spacing.sm - 2,
+    paddingLeft: spacing.s3,
+    paddingRight: spacing.s3,
+    paddingVertical: spacing.s2,
   },
-  pillText: { fontSize: 13, fontWeight: '500', color: colors.text, flexShrink: 1 },
-  pillTextActive: { color: colors.textInverse, fontWeight: '600' },
-  caret: { fontSize: 11, color: colors.textMuted, marginLeft: spacing.xs + 2 },
-  clearBtn: { paddingRight: spacing.md, paddingLeft: spacing.xs },
-  clearText: { fontSize: 16, lineHeight: 18, color: colors.textInverse },
+  pillText: { ...type.smallMedium, flexShrink: 1 },
+  pillTextActive: { color: colors.white },
+  caret: { fontSize: 11, color: colors.muted, marginLeft: spacing.s2 },
+  clearBtn: { paddingRight: spacing.s3, paddingLeft: spacing.s1 },
+  clearText: { fontSize: 16, lineHeight: 18, color: colors.white },
 
-  overlay: {
-    flex: 1,
-    backgroundColor: colors.overlay,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.lg,
-  },
+  overlay: { flex: 1, backgroundColor: colors.scrim, alignItems: 'center', justifyContent: 'center', padding: spacing.s4 },
   sheet: {
     width: '100%',
     maxWidth: 340,
     backgroundColor: colors.surface,
-    borderRadius: radius.card,
-    paddingVertical: spacing.sm,
-    ...shadow,
+    borderRadius: radius.dialog,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    paddingVertical: spacing.s2,
   },
-  sheetTitle: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
+  sheetTitle: { paddingHorizontal: spacing.s5, paddingVertical: spacing.s3 },
   option: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.s5,
+    paddingVertical: spacing.s3,
+    borderTopWidth: 1,
+    borderTopColor: colors.hairlineSoft,
   },
-  optionSelected: { backgroundColor: colors.secondaryBg },
-  optionText: { fontSize: 14, color: colors.text, flexShrink: 1 },
-  optionTextSelected: { fontWeight: '600', color: colors.primary },
-  check: { fontSize: 14, fontWeight: '700', color: colors.primary, marginLeft: spacing.sm },
+  optionSelected: { backgroundColor: colors.paper },
+  optionText: { ...type.body, color: colors.ink, flexShrink: 1 },
+  optionTextSelected: { fontFamily: type.cell.fontFamily },
+  check: { ...type.smallMedium, color: colors.brass, marginLeft: spacing.s2 },
 });

@@ -2,13 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { registerDialogHost } from '../alert';
 import Button from './Button';
-import { colors, radius, shadow, spacing, type } from '../theme';
+import { colors, formatMoney, radius, spacing, type } from '../theme';
 
 const TONES = {
-  error: { icon: '!', fg: colors.danger, bg: colors.dangerBg },
-  warning: { icon: '!', fg: colors.warning, bg: colors.warningBg },
-  success: { icon: '✓', fg: colors.success, bg: colors.successBg },
-  info: { icon: 'i', fg: colors.primary, bg: colors.secondaryBg },
+  error: { dot: colors.danger, eyebrow: 'Something went wrong' },
+  warning: { dot: colors.brass, eyebrow: 'Attention' },
+  success: { dot: colors.success, eyebrow: 'Done' },
+  info: { dot: colors.ink, eyebrow: 'Notice' },
 };
 
 const TOAST_MS = 2500;
@@ -45,6 +45,7 @@ export default function DialogHost() {
 
   const tone = TONES[current?.type] || TONES.error;
   const toastTone = TONES[toast?.type] || TONES.success;
+  const eyebrow = current?.eyebrow || (current?.kind === 'confirm' && current?.destructive ? 'Permanent action' : tone.eyebrow);
 
   return (
     <>
@@ -53,24 +54,39 @@ export default function DialogHost() {
           <Pressable style={StyleSheet.absoluteFill} onPress={() => close(false)} />
           {current ? (
             <View style={styles.dialog} accessibilityRole="alert">
-              <View style={[styles.icon, { backgroundColor: tone.bg }]}>
-                <Text style={[styles.iconText, { color: tone.fg }]}>{tone.icon}</Text>
+              <View style={styles.eyebrowRow}>
+                <View style={[styles.dot, { backgroundColor: tone.dot }]} />
+                <Text style={[type.label, { color: tone.dot }]}>{eyebrow}</Text>
               </View>
-              <Text style={[type.section, styles.title]}>{current.title}</Text>
-              {current.message ? <Text style={styles.message}>{current.message}</Text> : null}
+              <Text style={[type.dialog, styles.title]}>{current.title}</Text>
+              {current.message ? <Text style={[type.body, styles.message]}>{current.message}</Text> : null}
+
+              {current.detail ? (
+                <View style={styles.detail}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={type.cell} numberOfLines={1}>{current.detail.name}</Text>
+                    {current.detail.position ? (
+                      <Text style={type.caption} numberOfLines={1}>{current.detail.position}</Text>
+                    ) : null}
+                  </View>
+                  {current.detail.salary !== undefined ? (
+                    <Text style={type.cell}>{formatMoney(current.detail.salary)}</Text>
+                  ) : null}
+                </View>
+              ) : null}
+
               <View style={styles.buttons}>
                 {current.kind === 'confirm' ? (
                   <>
-                    <Button title={current.cancelText} variant="ghost" onPress={() => close(false)} style={styles.btn} />
+                    <Button title={current.cancelText} variant="secondary" onPress={() => close(false)} />
                     <Button
                       title={current.confirmText}
-                      variant={current.destructive ? 'dangerSolid' : 'primary'}
+                      variant={current.destructive ? 'danger' : 'primary'}
                       onPress={() => close(true)}
-                      style={styles.btn}
                     />
                   </>
                 ) : (
-                  <Button title="OK" onPress={() => close(true)} style={styles.btn} />
+                  <Button title="OK" onPress={() => close(true)} />
                 )}
               </View>
             </View>
@@ -80,11 +96,9 @@ export default function DialogHost() {
 
       {toast ? (
         <View style={styles.toastWrap} pointerEvents="none">
-          <View style={[styles.toast, { borderLeftColor: toastTone.fg }]}>
-            <View style={[styles.toastIcon, { backgroundColor: toastTone.bg }]}>
-              <Text style={[styles.toastIconText, { color: toastTone.fg }]}>{toastTone.icon}</Text>
-            </View>
-            <Text style={styles.toastText}>{toast.message}</Text>
+          <View style={styles.toast}>
+            <View style={[styles.dot, { backgroundColor: toastTone.dot === colors.ink ? colors.brassLight : toastTone.dot }]} />
+            <Text style={[type.smallMedium, { color: colors.white }]}>{toast.message}</Text>
           </View>
         </View>
       ) : null}
@@ -93,64 +107,40 @@ export default function DialogHost() {
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: colors.overlay,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.lg,
-  },
+  overlay: { flex: 1, backgroundColor: colors.scrim, alignItems: 'center', justifyContent: 'center', padding: spacing.s4 },
   dialog: {
     width: '100%',
-    maxWidth: 400,
+    maxWidth: 440,
     backgroundColor: colors.surface,
-    borderRadius: radius.card,
-    padding: spacing.xl,
-    alignItems: 'center',
-    ...shadow,
+    borderRadius: radius.dialog,
+    borderWidth: 1,
+    borderColor: colors.hairline,
+    padding: spacing.s7,
   },
-  icon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.md,
+  eyebrowRow: { flexDirection: 'row', alignItems: 'center' },
+  dot: { width: 6, height: 6, borderRadius: 3, marginRight: spacing.s2 },
+  title: { marginTop: spacing.s2 },
+  message: { marginTop: spacing.s3 },
+  detail: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.s3,
+    marginTop: spacing.s5,
+    paddingVertical: spacing.s4,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: colors.hairline,
   },
-  iconText: { fontSize: 22, fontWeight: '800' },
-  title: { textAlign: 'center' },
-  message: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: colors.textMuted,
-    textAlign: 'center',
-    marginTop: spacing.sm,
-  },
-  buttons: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xl, alignSelf: 'stretch' },
-  btn: { flex: 1 },
+  buttons: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.s3, marginTop: spacing.s6 },
 
-  toastWrap: { position: 'absolute', left: 0, right: 0, bottom: 84, alignItems: 'center', paddingHorizontal: spacing.lg },
+  toastWrap: { position: 'absolute', left: 0, right: 0, bottom: 88, alignItems: 'center', paddingHorizontal: spacing.s4 },
   toast: {
     flexDirection: 'row',
     alignItems: 'center',
-    maxWidth: 420,
-    backgroundColor: colors.surface,
+    maxWidth: 440,
+    backgroundColor: colors.ink,
     borderRadius: radius.control,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderLeftWidth: 4,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    ...shadow,
+    paddingVertical: spacing.s3,
+    paddingHorizontal: spacing.s5,
   },
-  toastIcon: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.sm,
-  },
-  toastIconText: { fontSize: 12, fontWeight: '800' },
-  toastText: { fontSize: 14, fontWeight: '500', color: colors.text },
 });

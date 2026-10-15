@@ -1,39 +1,124 @@
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import Button from '../components/Button';
-import Card from '../components/Card';
-import StatCard from '../components/StatCard';
-import { colors, formatMoney, MAX_WIDTH, radius, spacing, tierColors, type } from '../theme';
+import {
+  colors,
+  fonts,
+  formatDateTime,
+  formatMoney,
+  MAX_WIDTH,
+  spacing,
+  tierColors,
+  tierNames,
+  type,
+  WIDE,
+} from '../theme';
 
-const CHART_H = 180;
-const GRID_STEPS = 4;
+const CHART_H = 200;
+const STEPS = ['Normalise salary data', 'Assign employees to clusters', 'Compute tier averages'];
 
 const tierColor = (i) => tierColors[i % tierColors.length];
+const tierName = (i) => tierNames[i] || `Tier ${i + 1}`;
+const shortName = (name) => {
+  const parts = String(name).trim().split(/\s+/);
+  return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1][0]}.` : parts[0];
+};
 
-function BarChart({ clusters }) {
-  const max = Math.max(1, ...clusters.map((c) => c.count));
+// Assign each employee to the nearest centroid (same rule K-Means uses for its final assignment)
+function groupByTier(clusters, employees) {
+  const groups = clusters.map(() => []);
+  for (const e of employees) {
+    const s = Number(e.salary);
+    let best = 0;
+    for (let i = 1; i < clusters.length; i++) {
+      if (Math.abs(s - clusters[i].centroid) < Math.abs(s - clusters[best].centroid)) best = i;
+    }
+    if (groups[best]) groups[best].push(e);
+  }
+  return groups;
+}
+
+function niceTicks(max) {
+  const step = Math.max(1, Math.ceil(max / 3));
+  return [0, step, step * 2, step * 3];
+}
+
+function BarChart({ clusters, wide }) {
+  const ticks = niceTicks(Math.max(...clusters.map((c) => c.count)));
+  const top = ticks[ticks.length - 1];
   return (
     <View>
-      <View style={styles.plot}>
-        {Array.from({ length: GRID_STEPS }, (_, i) => (
-          <View key={i} style={[styles.gridline, { bottom: (CHART_H * (i + 1)) / GRID_STEPS }]} />
-        ))}
+      <View style={styles.plotRow}>
+        <View style={[styles.yAxis, { height: CHART_H }]}>
+          {ticks
+            .slice()
+            .reverse()
+            .map((t) => (
+              <Text key={t} style={[type.caption, styles.yTick]}>{t}</Text>
+            ))}
+        </View>
+        <View style={[styles.plot, { height: CHART_H }]}>
+          {ticks.slice(1).map((t) => (
+            <View key={t} style={[styles.gridline, { bottom: (t / top) * CHART_H }]} />
+          ))}
+          {clusters.map((c, i) => (
+            <View key={c.group} style={styles.barCol}>
+              <Text style={[type.numM, styles.barValue]}>{c.count}</Text>
+              <View
+                style={[
+                  styles.bar,
+                  { width: wide ? 96 : 48, height: Math.max(2, (c.count / top) * CHART_H), backgroundColor: tierColor(i) },
+                ]}
+              />
+            </View>
+          ))}
+        </View>
+      </View>
+      <View style={styles.xLabels}>
+        <View style={styles.yAxis} />
         {clusters.map((c, i) => (
-          <View key={c.group} style={styles.barCol}>
-            <Text style={styles.barValue}>{c.count}</Text>
-            <View
-              style={[
-                styles.bar,
-                { height: Math.max(4, (c.count / max) * CHART_H), backgroundColor: tierColor(i) },
-              ]}
-            />
+          <View key={c.group} style={styles.xLabel}>
+            <Text style={[type.smallMedium, styles.center]}>
+              {c.group}
+              {wide ? ` · ${tierName(i)}` : ''}
+            </Text>
+            <Text style={[type.caption, styles.center]}>Avg {formatMoney(c.centroid)}</Text>
           </View>
         ))}
       </View>
-      <View style={styles.labels}>
-        {clusters.map((c) => (
-          <View key={c.group} style={styles.labelCol}>
-            <Text style={styles.barLabel}>{c.group}</Text>
-            <Text style={styles.barSub}>{formatMoney(c.centroid)}</Text>
+    </View>
+  );
+}
+
+function Progress({ step, wide }) {
+  return (
+    <View style={styles.block}>
+      <Text style={[type.label, { color: colors.brass }]}>Analysis in progress</Text>
+      <Text style={[wide ? type.dialog : type.section, { marginTop: spacing.s2 }]}>Running K-Means clustering…</Text>
+      <Text style={[type.body, { color: colors.muted, marginTop: spacing.s2 }]}>
+        Grouping salaries into 3 tiers. This usually takes a few seconds.
+      </Text>
+      <View style={styles.track}>
+        <View style={[styles.trackFill, { width: `${((step + 1) / (STEPS.length + 1)) * 100}%` }]} />
+      </View>
+      <View style={styles.steps}>
+        {STEPS.map((s, i) => {
+          const state = i < step ? 'Done' : i === step ? 'In progress' : 'Waiting';
+          const dot = i < step ? colors.success : i === step ? colors.brass : 'transparent';
+          return (
+            <View key={s} style={styles.stepRow}>
+              <Text style={[type.caption, { width: 32 }]}>{String(i + 1).padStart(2, '0')}</Text>
+              <Text style={[i === step ? type.smallMedium : type.small, { flex: 1 }]}>{s}</Text>
+              <View style={[styles.stepDot, { backgroundColor: dot }, i > step && styles.stepDotEmpty]} />
+              <Text style={[type.caption, i === step && { color: colors.ink }]}>{state}</Text>
+            </View>
+          );
+        })}
+      </View>
+      <View style={styles.skeleton}>
+        {[0.7, 0.45, 0.3].map((h, i) => (
+          <View key={i} style={styles.skelCol}>
+            <View style={[styles.skelBar, { height: CHART_H * h }]} />
           </View>
         ))}
       </View>
@@ -42,76 +127,158 @@ function BarChart({ clusters }) {
 }
 
 export default function AnalyticsScreen({ analysis, analyzing, onAnalyze }) {
+  const { width } = useWindowDimensions();
+  const wide = width >= WIDE;
+  const [step, setStep] = useState(0);
+
+  // Decorative step progression while the request is running
+  useEffect(() => {
+    if (!analyzing) return undefined;
+    setStep(0);
+    const t1 = setTimeout(() => setStep(1), 300);
+    const t2 = setTimeout(() => setStep(2), 650);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [analyzing]);
+
   const clusters = analysis?.clusters || [];
-  const kpi = analysis?.kpi;
+  const employees = analysis?.employees || [];
+  const pad = wide ? spacing.s10 : spacing.s5;
 
   let content;
   if (analyzing) {
-    content = (
-      <View style={styles.state}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={[styles.muted, { marginTop: spacing.md }]}>Running K-Means clustering...</Text>
-      </View>
-    );
+    content = <Progress step={step} wide={wide} />;
   } else if (!analysis) {
     content = (
-      <Card style={styles.state}>
-        <Text style={type.section}>No analysis yet</Text>
-        <Text style={[styles.muted, styles.center, { marginTop: spacing.xs }]}>
-          Click "Analyze Salary Structure" to group salaries into tiers.
+      <View style={styles.block}>
+        <Text style={type.label}>Not yet analyzed</Text>
+        <Text style={[wide ? type.dialog : type.section, { marginTop: spacing.s2 }]}>No analysis yet.</Text>
+        <Text style={[type.body, { marginTop: spacing.s3, maxWidth: 520 }]}>
+          Run “Analyze Salary Structure” to group every employee into salary tiers.
         </Text>
-      </Card>
+      </View>
     );
-  } else if (clusters.length === 0) {
+  } else if (clusters.length === 0 || employees.length === 0) {
     content = (
-      <Card style={styles.state}>
-        <Text style={type.section}>No data</Text>
-        <Text style={[styles.muted, { marginTop: spacing.xs }]}>There are no employees to analyze.</Text>
-      </Card>
+      <View style={styles.block}>
+        <Text style={type.label}>No data</Text>
+        <Text style={[wide ? type.dialog : type.section, { marginTop: spacing.s2 }]}>Nothing to analyze.</Text>
+        <Text style={[type.body, { marginTop: spacing.s3 }]}>Add employees first, then run the analysis again.</Text>
+      </View>
     );
   } else {
+    const salaries = employees.map((e) => Number(e.salary));
+    const avg = salaries.reduce((a, b) => a + b, 0) / salaries.length;
+    const highest = employees.reduce((a, b) => (Number(b.salary) > Number(a.salary) ? b : a));
+    const lowest = employees.reduce((a, b) => (Number(b.salary) < Number(a.salary) ? b : a));
+    const groups = groupByTier(clusters, employees);
+
+    const kpis = [
+      { label: 'Company average', value: formatMoney(Math.round(avg)), sub: `Mean across ${employees.length} employees` },
+      {
+        label: 'Highest',
+        value: formatMoney(highest.salary),
+        sub: `${highest.name} · ${highest.position}`,
+        color: colors.brass,
+      },
+      { label: 'Lowest', value: formatMoney(lowest.salary), sub: `${lowest.name} · ${lowest.position}` },
+    ];
+
     content = (
       <>
-        {kpi ? (
-          <View style={styles.row}>
-            <StatCard label="Company Avg Salary" value={formatMoney(Math.round(kpi.avg))} color={colors.primary} style={styles.kpi} />
-            <StatCard label="Highest" value={formatMoney(kpi.max)} color={colors.accent} style={styles.kpi} />
-            <StatCard label="Lowest" value={formatMoney(kpi.min)} color={tierColors[0]} style={styles.kpi} />
-          </View>
-        ) : null}
-
-        <Card title="Employees per Tier" subtitle="1D K-Means clustering (k = 3) on base salary" style={styles.block}>
-          <BarChart clusters={clusters} />
-        </Card>
-
-        <View style={styles.tiers}>
-          {clusters.map((c, i) => (
-            <View key={c.group} style={[styles.tierCard, { borderTopColor: tierColor(i) }]}>
-              <View style={styles.tierHead}>
-                <View style={[styles.dot, { backgroundColor: tierColor(i) }]} />
-                <Text style={type.section}>{c.group}</Text>
-              </View>
-              <Text style={type.caption}>Employees</Text>
-              <Text style={styles.tierValue}>{c.count}</Text>
-              <Text style={[type.caption, { marginTop: spacing.sm }]}>Average Base Salary</Text>
-              <Text style={styles.tierValue}>{formatMoney(c.centroid)}</Text>
+        <View style={[styles.kpis, !wide && styles.column]}>
+          {kpis.map((k, i) => (
+            <View
+              key={k.label}
+              style={[
+                styles.kpi,
+                wide && i > 0 && styles.kpiDivider,
+                wide && { paddingLeft: i === 0 ? 0 : spacing.s8 },
+                !wide && i > 0 && styles.kpiDividerTop,
+              ]}
+            >
+              <Text style={type.label}>{k.label}</Text>
+              <Text style={[wide ? type.numL : type.numM, styles.kpiValue, k.color && { color: k.color }]}>{k.value}</Text>
+              <Text style={type.caption} numberOfLines={1}>{k.sub}</Text>
             </View>
           ))}
+        </View>
+
+        <View style={styles.sectionHead}>
+          <View style={styles.sectionTitle}>
+            <Text style={[type.label, styles.fig]}>Fig. 1</Text>
+            <Text style={type.section}>Employees per Tier</Text>
+          </View>
+          {wide ? <Text style={type.small}>Headcount by cluster · n = {employees.length}</Text> : null}
+        </View>
+        <BarChart clusters={clusters} wide={wide} />
+
+        <View style={[styles.sectionHead, { marginTop: spacing.s10 }]}>
+          <View style={styles.sectionTitle}>
+            <Text style={[type.label, styles.fig]}>Table 1</Text>
+            <Text style={type.section}>Tier Summary</Text>
+          </View>
+        </View>
+        <View style={[styles.tiers, !wide && styles.column]}>
+          {clusters.map((c, i) => {
+            const members = groups[i] || [];
+            const s = members.map((m) => Number(m.salary));
+            const min = s.length ? Math.min(...s) : c.centroid;
+            const max = s.length ? Math.max(...s) : c.centroid;
+            return (
+              <View key={c.group} style={[styles.tier, { borderTopColor: tierColor(i) }]}>
+                <Text style={type.label}>
+                  {c.group} — {tierName(i)}
+                </Text>
+                <View style={styles.tierCount}>
+                  <Text style={type.numL}>{c.count}</Text>
+                  <Text style={[type.small, { marginLeft: spacing.s2 }]}>{c.count === 1 ? 'employee' : 'employees'}</Text>
+                </View>
+                <View style={styles.kv}>
+                  <Text style={type.small}>Average base salary</Text>
+                  <Text style={type.numM}>{formatMoney(c.centroid)}</Text>
+                </View>
+                <View style={styles.kv}>
+                  <Text style={type.small}>Range</Text>
+                  <Text style={type.smallMedium}>
+                    {min === max ? formatMoney(min) : `${formatMoney(min)} – ${formatMoney(max)}`}
+                  </Text>
+                </View>
+                <Text style={[type.caption, { marginTop: spacing.s3 }]}>
+                  {members.map((m) => shortName(m.name)).join(', ')}
+                </Text>
+              </View>
+            );
+          })}
         </View>
       </>
     );
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.content}>
-      <View style={styles.toolbar}>
-        <View style={{ flex: 1, minWidth: 200 }}>
-          <Text style={type.title}>Salary Analytics</Text>
-          <Text style={styles.muted}>
-            {analysis?.at ? `Last analyzed: ${analysis.at.toLocaleString()}` : 'Not analyzed yet'}
+    <ScrollView contentContainerStyle={[styles.content, { paddingHorizontal: pad }]}>
+      <View style={[styles.head, !wide && styles.column]}>
+        <View style={{ flex: 1, maxWidth: 560 }}>
+          <Text style={type.label}>Compensation review</Text>
+          <Text style={[wide ? type.title : type.titleMobile, { marginTop: spacing.s2 }]}>Salary Structure</Text>
+          <Text style={[type.body, { color: colors.muted, marginTop: spacing.s2 }]}>
+            Employees grouped into three salary tiers by K-Means clustering (k = 3) on monthly base salary.
           </Text>
         </View>
-        <Button title="Analyze Salary Structure" onPress={onAnalyze} loading={analyzing} />
+        <View style={[styles.headRight, !wide && styles.headRightNarrow]}>
+          <Button title="Analyze Salary Structure" loadingTitle="Analyzing…" onPress={onAnalyze} loading={analyzing} />
+          <Text style={[type.caption, { marginTop: spacing.s2 }]}>
+            {analysis?.at ? (
+              <>
+                Last analyzed <Text style={{ fontFamily: fonts.sansSemi, color: colors.ink }}>{formatDateTime(analysis.at)}</Text>
+              </>
+            ) : (
+              'Not analyzed yet'
+            )}
+          </Text>
+        </View>
       </View>
       {content}
     </ScrollView>
@@ -119,50 +286,90 @@ export default function AnalyticsScreen({ analysis, analyzing, onAnalyze }) {
 }
 
 const styles = StyleSheet.create({
-  content: { padding: spacing.lg, paddingBottom: spacing.xxl, width: '100%', maxWidth: MAX_WIDTH, alignSelf: 'center' },
-  toolbar: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  muted: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
+  content: { paddingTop: spacing.s10, paddingBottom: spacing.s12, width: '100%', maxWidth: MAX_WIDTH + 96, alignSelf: 'center' },
+  column: { flexDirection: 'column' },
   center: { textAlign: 'center' },
-  state: { alignItems: 'center', justifyContent: 'center', paddingVertical: spacing.xxl },
-  row: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginBottom: spacing.lg },
-  block: { marginBottom: spacing.lg },
-  kpi: { minWidth: 160 },
 
+  head: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: spacing.s6,
+    paddingBottom: spacing.s6,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.ink,
+  },
+  headRight: { alignItems: 'flex-end' },
+  headRightNarrow: { alignItems: 'flex-start', alignSelf: 'stretch' },
+
+  block: { paddingVertical: spacing.s9 },
+
+  kpis: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.hairline, marginBottom: spacing.s10 },
+  kpi: { flex: 1, paddingVertical: spacing.s7, paddingRight: spacing.s4 },
+  kpiDivider: { borderLeftWidth: 1, borderLeftColor: colors.hairline },
+  kpiDividerTop: { borderTopWidth: 1, borderTopColor: colors.hairline },
+  kpiValue: { marginTop: spacing.s2, marginBottom: spacing.s2 },
+
+  sectionHead: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: spacing.s2,
+    marginBottom: spacing.s6,
+  },
+  sectionTitle: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.s3 },
+  fig: { color: colors.brass },
+
+  plotRow: { flexDirection: 'row' },
+  yAxis: { width: 28, justifyContent: 'space-between' },
+  yTick: { marginTop: -8, marginBottom: -8 },
   plot: {
-    height: CHART_H + 24,
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'flex-end',
     borderBottomWidth: 1,
-    borderBottomColor: colors.textMuted,
-    paddingHorizontal: spacing.sm,
+    borderBottomColor: colors.ink,
   },
-  gridline: { position: 'absolute', left: 0, right: 0, height: 1, backgroundColor: colors.grid },
+  gridline: { position: 'absolute', left: 0, right: 0, height: 1, backgroundColor: colors.hairlineSoft },
   barCol: { flex: 1, alignItems: 'center', justifyContent: 'flex-end' },
-  barValue: { fontSize: 13, fontWeight: '700', color: colors.text, marginBottom: spacing.xs },
-  bar: { width: '50%', maxWidth: 72, borderTopLeftRadius: 4, borderTopRightRadius: 4 },
-  labels: { flexDirection: 'row', paddingHorizontal: spacing.sm, marginTop: spacing.sm },
-  labelCol: { flex: 1, alignItems: 'center' },
-  barLabel: { fontSize: 13, fontWeight: '600', color: colors.text },
-  barSub: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  barValue: { marginBottom: spacing.s2 },
+  bar: {},
+  xLabels: { flexDirection: 'row', marginTop: spacing.s3 },
+  xLabel: { flex: 1, alignItems: 'center', paddingHorizontal: spacing.s1 },
 
-  tiers: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
-  tierCard: {
-    flexGrow: 1,
-    flexBasis: 220,
-    backgroundColor: colors.surface,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderTopWidth: 4,
-    padding: spacing.lg,
+  tiers: { flexDirection: 'row', gap: spacing.s8 },
+  tier: { flex: 1, borderTopWidth: 3, paddingTop: spacing.s4, paddingBottom: spacing.s4 },
+  tierCount: { flexDirection: 'row', alignItems: 'baseline', marginTop: spacing.s2, marginBottom: spacing.s4 },
+  kv: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.s2,
+    borderTopWidth: 1,
+    borderTopColor: colors.hairlineSoft,
   },
-  tierHead: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md },
-  dot: { width: 10, height: 10, borderRadius: 5, marginRight: spacing.sm },
-  tierValue: { fontSize: 20, fontWeight: '700', color: colors.text, marginTop: 2 },
+
+  track: { height: 2, backgroundColor: colors.hairline, marginTop: spacing.s6, maxWidth: 480 },
+  trackFill: { height: 2, backgroundColor: colors.brass },
+  steps: { maxWidth: 480, marginTop: spacing.s5 },
+  stepRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.s3,
+    borderTopWidth: 1,
+    borderTopColor: colors.hairlineSoft,
+  },
+  stepDot: { width: 6, height: 6, borderRadius: 3, marginRight: spacing.s2 },
+  stepDotEmpty: { borderWidth: 1, borderColor: colors.muted },
+  skeleton: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    height: CHART_H,
+    marginTop: spacing.s10,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.hairline,
+  },
+  skelCol: { flex: 1, alignItems: 'center' },
+  skelBar: { width: '40%', backgroundColor: colors.skeleton },
 });

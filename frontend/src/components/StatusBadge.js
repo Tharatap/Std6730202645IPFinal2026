@@ -1,26 +1,19 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, radius, spacing } from '../theme';
+import { colors, spacing, type } from '../theme';
 
-export default function StatusBadge({ status }) {
+// Design: colored dot + plain text (green Active / brass On Leave)
+export default function StatusBadge({ status, style }) {
   const active = status === 'Active';
-  const fg = active ? colors.success : colors.warning;
   return (
-    <View style={[styles.badge, { backgroundColor: active ? colors.successBg : colors.warningBg }]}>
-      <View style={[styles.dot, { backgroundColor: fg }]} />
-      <Text style={[styles.text, { color: fg }]}>{status}</Text>
+    <View style={[styles.row, style]}>
+      <View style={[styles.dot, { backgroundColor: active ? colors.success : colors.brass }]} />
+      <Text style={[type.small, styles.text]}>{status}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: spacing.xs,
-  },
-  dot: { width: 6, height: 6, borderRadius: 3, marginRight: spacing.xs + 2 },
-  text: { fontSize: 12, fontWeight: '600' },
+  row: { flexDirection: 'row', alignItems: 'center' },
+  dot: { width: 7, height: 7, borderRadius: 4, marginRight: spacing.s2 },
+  text: { color: colors.inkSoft },
 });

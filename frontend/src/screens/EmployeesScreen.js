@@ -1,26 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { apiRequest } from '../api';
 import { confirmAsync, showToast } from '../alert';
 import AppModal from '../components/AppModal';
 import Button from '../components/Button';
 import Dropdown from '../components/Dropdown';
 import Input from '../components/Input';
-import StatCard from '../components/StatCard';
 import StatusBadge from '../components/StatusBadge';
-import { colors, formatMoney, MAX_WIDTH, radius, shadow, spacing, type } from '../theme';
+import { colors, fonts, formatDate, MAX_WIDTH, spacing, type, WIDE } from '../theme';
 
-const SALARY_RE = /^\d+(\.\d{1,2})?$/;
-const EMPTY_FORM = { name: '', position: '', salary: '' };
 const AMOUNT_RE = /^\d+(\.\d{1,2})?$/;
+const EMPTY_FORM = { name: '', position: '', salary: '' };
+const NARROW = 420;
 
 const STATUS_OPTIONS = [
   { label: 'All statuses', value: '' },
@@ -59,8 +50,20 @@ function buildQuery(q) {
   if (q.salary.max !== null) params.push(`maxSalary=${q.salary.max}`);
   return params.length ? `?${params.join('&')}` : '';
 }
-const WIDE = 768;
-const NARROW = 420;
+
+function validate(form) {
+  const errors = {};
+  const name = form.name.trim();
+  const position = form.position.trim();
+  const salary = form.salary.trim();
+  if (!name) errors.name = 'Enter a full name.';
+  else if (name.length > 100) errors.name = 'Name must be at most 100 characters.';
+  if (!position) errors.position = 'Enter a position.';
+  else if (position.length > 100) errors.position = 'Position must be at most 100 characters.';
+  if (!salary || !AMOUNT_RE.test(salary) || !(Number(salary) > 0)) errors.salary = 'Enter a salary greater than ฿0.';
+  else if (Number(salary) > 99999999.99) errors.salary = 'Salary is too large.';
+  return errors;
+}
 
 function SearchIcon() {
   return (
@@ -71,19 +74,14 @@ function SearchIcon() {
   );
 }
 
-function validate(form) {
-  const errors = {};
-  const name = form.name.trim();
-  const position = form.position.trim();
-  const salary = form.salary.trim();
-  if (!name) errors.name = 'Name is required';
-  else if (name.length > 100) errors.name = 'Name must be at most 100 characters';
-  if (!position) errors.position = 'Position is required';
-  else if (position.length > 100) errors.position = 'Position must be at most 100 characters';
-  if (!salary) errors.salary = 'Salary is required';
-  else if (!SALARY_RE.test(salary) || !(Number(salary) > 0)) errors.salary = 'Salary must be a positive number';
-  else if (Number(salary) > 99999999.99) errors.salary = 'Salary is too large';
-  return errors;
+// Salary with muted ฿ prefix
+function Money({ value, style }) {
+  return (
+    <Text style={[type.cell, style]}>
+      <Text style={styles.baht}>฿</Text>
+      {Number(value).toLocaleString('en-US', { maximumFractionDigits: 2 })}
+    </Text>
+  );
 }
 
 export default function EmployeesScreen({ token, onError, onAnalyze, analyzing, onDataChanged }) {
@@ -98,9 +96,6 @@ export default function EmployeesScreen({ token, onError, onAnalyze, analyzing, 
   const [searching, setSearching] = useState(false);
   const [filters, setFilters] = useState(NO_FILTERS);
   const [positions, setPositions] = useState([]);
-  const [rangeOpen, setRangeOpen] = useState(false);
-  const [range, setRange] = useState({ min: '', max: '' });
-  const [rangeErrors, setRangeErrors] = useState({});
   const [busyId, setBusyId] = useState(null);
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -108,6 +103,10 @@ export default function EmployeesScreen({ token, onError, onAnalyze, analyzing, 
   const [form, setForm] = useState(EMPTY_FORM);
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
+
+  const [rangeOpen, setRangeOpen] = useState(false);
+  const [range, setRange] = useState({ min: '', max: '' });
+  const [rangeErrors, setRangeErrors] = useState({});
 
   const appliedQuery = useRef({ search: '', ...NO_FILTERS });
   const prevSearch = useRef('');
@@ -129,10 +128,10 @@ export default function EmployeesScreen({ token, onError, onAnalyze, analyzing, 
         const active = all.filter((e) => e.status === 'Active').length;
         appliedQuery.current = query;
         setEmployees(list);
-        setPositions([...new Set(all.map((e) => e.position))].sort((a, b) => a.localeCompare(b)));
         setStats({ total: all.length, active, leave: all.length - active });
+        setPositions([...new Set(all.map((e) => e.position))].sort((a, b) => a.localeCompare(b)));
       } catch (e) {
-        if (id === requestId.current) onError(e, 'Load Failed');
+        if (id === requestId.current) onError(e, 'Could not load employees');
       }
     },
     [token, onError]
@@ -179,11 +178,11 @@ export default function EmployeesScreen({ token, onError, onAnalyze, analyzing, 
     const min = range.min.trim();
     const max = range.max.trim();
     const errs = {};
-    if (!min && !max) errs.min = 'Enter a minimum, a maximum, or both';
-    if (min && !AMOUNT_RE.test(min)) errs.min = 'Minimum must be a number of 0 or more';
-    if (max && !AMOUNT_RE.test(max)) errs.max = 'Maximum must be a number of 0 or more';
+    if (!min && !max) errs.min = 'Enter a minimum, a maximum, or both.';
+    if (min && !AMOUNT_RE.test(min)) errs.min = 'Minimum must be a number of 0 or more.';
+    if (max && !AMOUNT_RE.test(max)) errs.max = 'Maximum must be a number of 0 or more.';
     if (!errs.min && !errs.max && min && max && Number(min) > Number(max)) {
-      errs.max = 'Maximum must be greater than or equal to minimum';
+      errs.max = 'Maximum must be greater than or equal to minimum.';
     }
     setRangeErrors(errs);
     if (Object.keys(errs).length) return;
@@ -195,8 +194,6 @@ export default function EmployeesScreen({ token, onError, onAnalyze, analyzing, 
     setSearch('');
     setFilters(NO_FILTERS);
   };
-
-  const hasFilters = !!(filters.position || filters.status || filters.salary.key !== 'any');
 
   const handleToggle = async (id) => {
     if (busyId) return;
@@ -213,17 +210,21 @@ export default function EmployeesScreen({ token, onError, onAnalyze, analyzing, 
   };
 
   const handleDelete = async (item) => {
-    const { id } = item;
     if (busyId) return;
     const ok = await confirmAsync(
-      `Delete "${item.name}"?`,
-      'This employee will be permanently removed from the database. This action cannot be undone.',
-      { confirmText: 'Delete', cancelText: 'Cancel', destructive: true }
+      'Delete employee?',
+      'Are you sure you want to delete this record? This cannot be undone.',
+      {
+        confirmText: 'Delete employee',
+        cancelText: 'Cancel',
+        destructive: true,
+        detail: { name: item.name, position: item.position, salary: item.salary },
+      }
     );
     if (!ok) return;
-    setBusyId(id);
+    setBusyId(item.id);
     try {
-      await apiRequest(`/employees/${encodeURIComponent(id)}`, { method: 'DELETE', token });
+      await apiRequest(`/employees/${encodeURIComponent(item.id)}`, { method: 'DELETE', token });
       onDataChanged();
       await refetch();
       showToast('Employee deleted');
@@ -287,71 +288,103 @@ export default function EmployeesScreen({ token, onError, onAnalyze, analyzing, 
   };
 
   const term = search.trim();
+  const hasFilters = !!(filters.position || filters.status || filters.salary.key !== 'any');
+  const pad = wide ? spacing.s10 : spacing.s5;
 
   const actions = (item) => {
     const busy = busyId === item.id;
     return (
-      <View style={styles.actions}>
-        <Button title="Edit" variant="ghost" size="sm" onPress={() => openEdit(item)} disabled={!!busyId} />
+      <View style={[styles.actions, !wide && styles.actionsLeft]}>
+        <Button title="Edit" variant="link" onPress={() => openEdit(item)} disabled={!!busyId} />
+        <View style={styles.vr} />
         <Button
-          title="Toggle Status"
-          variant="secondary"
-          size="sm"
+          title="Toggle status"
+          loadingTitle="Updating…"
+          variant="link"
           onPress={() => handleToggle(item.id)}
           loading={busy}
           disabled={!!busyId && !busy}
         />
-        <Button title="Delete" variant="danger" size="sm" onPress={() => handleDelete(item)} disabled={!!busyId} />
+        <View style={styles.vr} />
+        <Button title="Delete" variant="linkDanger" onPress={() => handleDelete(item)} disabled={!!busyId} />
       </View>
     );
   };
 
   const renderRow = ({ item, index }) => {
     if (wide) {
-      const last = index === employees.length - 1;
       return (
-        <View style={[styles.row, index % 2 === 1 && styles.rowAlt, last && styles.rowLast]}>
+        <View style={styles.row}>
+          <Text style={[type.small, styles.colNo]}>{String(index + 1).padStart(2, '0')}</Text>
           <Pressable style={styles.colName} onPress={() => openEdit(item)}>
-            <Text style={[styles.cell, styles.strong, styles.link]} numberOfLines={1}>{item.name}</Text>
+            <Text style={type.cell} numberOfLines={1}>{item.name}</Text>
           </Pressable>
-          <Text style={[styles.cell, styles.colPos]} numberOfLines={1}>{item.position}</Text>
+          <Text style={[type.body, styles.colPos]} numberOfLines={1}>{item.position}</Text>
           <View style={styles.colStatus}><StatusBadge status={item.status} /></View>
-          <Text style={[styles.cell, styles.colSalary, styles.strong]}>{formatMoney(item.salary)}</Text>
+          <Money value={item.salary} style={styles.colSalary} />
           <View style={styles.colActions}>{actions(item)}</View>
         </View>
       );
     }
     return (
-      <View style={styles.mCard}>
+      <View style={styles.mRow}>
         <View style={styles.mTop}>
           <Pressable style={{ flex: 1 }} onPress={() => openEdit(item)}>
-            <Text style={[type.body, styles.strong]} numberOfLines={1}>{item.name}</Text>
-            <Text style={styles.muted} numberOfLines={1}>{item.position}</Text>
+            <Text style={type.cell} numberOfLines={1}>{item.name}</Text>
+            <Text style={[type.small, { marginTop: 2 }]} numberOfLines={1}>{item.position}</Text>
           </Pressable>
-          <StatusBadge status={item.status} />
-        </View>
-        <View style={styles.mBottom}>
-          <View>
-            <Text style={type.caption}>Salary</Text>
-            <Text style={styles.mSalary}>{formatMoney(item.salary)}</Text>
+          <View style={styles.mRight}>
+            <Money value={item.salary} />
+            <StatusBadge status={item.status} style={{ marginTop: spacing.s1 }} />
           </View>
-          {actions(item)}
         </View>
+        <View style={{ marginTop: spacing.s3 }}>{actions(item)}</View>
       </View>
     );
   };
 
+  const statCells = [
+    { label: wide ? 'Total staff' : 'Total', value: stats.total, sub: 'Headcount on record' },
+    {
+      label: 'Active',
+      value: stats.active,
+      sub: stats.total ? `${Math.round((stats.active / stats.total) * 100)}% of staff` : '—',
+    },
+    { label: 'On leave', value: stats.leave, sub: 'Currently away', color: colors.brass },
+  ];
+
   const header = (
     <View>
+      <View style={styles.titleRow}>
+        <View style={{ flex: 1 }}>
+          <Text style={type.label}>People directory</Text>
+          <Text style={[wide ? type.title : type.titleMobile, { marginTop: spacing.s2 }]}>Employees</Text>
+        </View>
+        {wide ? <Text style={type.small}>As of {formatDate(new Date())}</Text> : null}
+      </View>
+
       <View style={styles.stats}>
-        <StatCard label="Total" value={stats.total} color={colors.primary} />
-        <StatCard label="Active" value={stats.active} color={colors.success} />
-        <StatCard label="On Leave" value={stats.leave} color={colors.warning} />
+        {statCells.map((s, i) => (
+          <View
+            key={s.label}
+            style={[
+              styles.stat,
+              { paddingLeft: i === 0 ? 0 : wide ? spacing.s8 : spacing.s3 },
+              i > 0 && styles.statDivider,
+            ]}
+          >
+            <Text style={type.label}>{s.label}</Text>
+            <Text style={[wide ? type.numXL : type.numL, styles.statValue, s.color && { color: s.color }]}>
+              {s.value}
+            </Text>
+            {wide ? <Text style={type.small}>{s.sub}</Text> : null}
+          </View>
+        ))}
       </View>
 
       <View style={[styles.toolbar, !wide && styles.toolbarNarrow]}>
         <Input
-          containerStyle={wide ? styles.search : styles.searchNarrow}
+          containerStyle={wide ? styles.searchWide : styles.searchNarrow}
           value={search}
           onChangeText={setSearch}
           placeholder="Search by name or position"
@@ -360,24 +393,31 @@ export default function EmployeesScreen({ token, onError, onAnalyze, analyzing, 
           left={<SearchIcon />}
           right={
             searching ? (
-              <ActivityIndicator size="small" color={colors.textMuted} />
+              <ActivityIndicator size="small" color={colors.muted} />
             ) : search ? (
               <Pressable onPress={() => setSearch('')} hitSlop={8} accessibilityLabel="Clear search">
-                <Text style={styles.clear}>×</Text>
+                <Text style={styles.clearX}>×</Text>
               </Pressable>
             ) : null
           }
         />
-        <View style={[styles.toolbarButtons, veryNarrow && styles.toolbarButtonsStack]}>
-          <Button
-            title="Analyze Salary Structure"
-            variant="secondary"
-            onPress={onAnalyze}
-            loading={analyzing}
-            style={!wide && !veryNarrow && styles.flexBtn}
-          />
-          <Button title="+ Add Employee" onPress={openAdd} style={!wide && !veryNarrow && styles.flexBtn} />
-        </View>
+        {wide ? (
+          <View style={styles.toolbarButtons}>
+            <Button title="Analyze Salary Structure" variant="secondary" onPress={onAnalyze} loading={analyzing} />
+            <Button title="+ Add Employee" onPress={openAdd} />
+          </View>
+        ) : (
+          <View style={[styles.toolbarButtons, veryNarrow && styles.stack]}>
+            <Button title="+ Add Employee" onPress={openAdd} style={!veryNarrow && styles.flex} />
+            <Button
+              title="Analyze Salaries"
+              variant="secondary"
+              onPress={onAnalyze}
+              loading={analyzing}
+              style={!veryNarrow && styles.flex}
+            />
+          </View>
+        )}
       </View>
 
       <View style={styles.filters}>
@@ -409,52 +449,72 @@ export default function EmployeesScreen({ token, onError, onAnalyze, analyzing, 
           onClear={() => setFilter('salary', NO_FILTERS.salary)}
         />
         {hasFilters || term ? (
-          <Pressable onPress={clearFilters} hitSlop={6}>
-            <Text style={styles.clearAll}>Clear filters</Text>
-          </Pressable>
+          <Button title="Clear filters" variant="link" onPress={clearFilters} style={{ marginLeft: spacing.s2 }} />
         ) : null}
       </View>
-      {!loading && (hasFilters || term) ? (
-        <Text style={styles.count}>
-          Showing {employees.length} of {stats.total} employees
+
+      <View style={styles.tableHead}>
+        {wide ? (
+          <>
+            <Text style={[type.label, styles.colNo]}>No.</Text>
+            <Text style={[type.label, styles.colName]}>Name</Text>
+            <Text style={[type.label, styles.colPos]}>Position</Text>
+            <Text style={[type.label, styles.colStatus]}>Status</Text>
+            <Text style={[type.label, styles.colSalary]}>Salary</Text>
+            <Text style={[type.label, styles.colActions, styles.right]}>Actions</Text>
+          </>
+        ) : (
+          <>
+            <Text style={[type.label, { flex: 1 }]}>Name / Position</Text>
+            <Text style={type.label}>Salary</Text>
+          </>
+        )}
+      </View>
+    </View>
+  );
+
+  const footer = !loading ? (
+    <View style={styles.footer}>
+      <Text style={type.small}>
+        {wide
+          ? `Showing ${employees.length} of ${stats.total} employees`
+          : `Showing ${employees.length} of ${stats.total} · monthly gross, THB`}
+      </Text>
+      {wide ? <Text style={type.small}>Salaries shown as monthly gross, Thai Baht</Text> : null}
+    </View>
+  ) : null;
+
+  let empty;
+  if (loading) {
+    empty = <ActivityIndicator style={{ marginVertical: spacing.s10 }} color={colors.ink} />;
+  } else if (term || hasFilters) {
+    empty = (
+      <View style={styles.empty}>
+        <Text style={type.label}>No results</Text>
+        <Text style={[wide ? type.dialog : type.section, { marginTop: spacing.s2 }]}>
+          {term && !hasFilters ? `Nobody matches “${term}”.` : 'Nobody matches these filters.'}
         </Text>
-      ) : null}
-
-      {wide && employees.length > 0 ? (
-        <View style={styles.tableHead}>
-          <Text style={[type.caption, styles.colName]}>Name</Text>
-          <Text style={[type.caption, styles.colPos]}>Position</Text>
-          <Text style={[type.caption, styles.colStatus]}>Status</Text>
-          <Text style={[type.caption, styles.colSalary]}>Salary</Text>
-          <Text style={[type.caption, styles.colActions, styles.right]}>Actions</Text>
-        </View>
-      ) : null}
-    </View>
-  );
-
-  const empty = loading ? (
-    <ActivityIndicator style={{ marginTop: spacing.xxl }} size="large" color={colors.primary} />
-  ) : (
-    <View style={styles.empty}>
-      <Text style={type.section}>
-        {hasFilters ? 'No employees match these filters' : 'No employees found'}
-      </Text>
-      <Text style={[styles.muted, { marginTop: spacing.xs, textAlign: 'center' }]}>
-        {hasFilters || term
-          ? 'Try a different keyword or adjust the filters.'
-          : 'Add your first employee to get started.'}
-      </Text>
-      {hasFilters || term ? (
+        <Text style={[type.body, { marginTop: spacing.s3, maxWidth: 520 }]}>
+          Check the spelling, or search by position instead — for example “Engineer” or “Accountant”.
+        </Text>
         <Button
-          title="Clear filters"
-          variant="secondary"
-          size="sm"
+          title={hasFilters ? 'Clear filters' : 'Clear search'}
+          variant="link"
           onPress={clearFilters}
-          style={{ marginTop: spacing.md }}
+          style={{ marginTop: spacing.s6, alignSelf: 'flex-start' }}
         />
-      ) : null}
-    </View>
-  );
+      </View>
+    );
+  } else {
+    empty = (
+      <View style={styles.empty}>
+        <Text style={type.label}>Empty directory</Text>
+        <Text style={[wide ? type.dialog : type.section, { marginTop: spacing.s2 }]}>No employees yet.</Text>
+        <Text style={[type.body, { marginTop: spacing.s3 }]}>Add your first employee to get started.</Text>
+        <Button title="+ Add Employee" onPress={openAdd} style={{ marginTop: spacing.s6, alignSelf: 'flex-start' }} />
+      </View>
+    );
+  }
 
   return (
     <>
@@ -464,45 +524,52 @@ export default function EmployeesScreen({ token, onError, onAnalyze, analyzing, 
         renderItem={renderRow}
         ListHeaderComponent={header}
         ListEmptyComponent={empty}
-        contentContainerStyle={styles.content}
+        ListFooterComponent={footer}
+        contentContainerStyle={[styles.content, { paddingHorizontal: pad }]}
         keyboardShouldPersistTaps="handled"
         extraData={[busyId, wide]}
       />
 
       <AppModal
         visible={modalOpen}
-        title={editing ? 'Edit Employee' : 'Add Employee'}
+        eyebrow={editing ? 'Edit record' : 'New record'}
+        title={editing ? 'Edit employee' : 'Add employee'}
         onClose={closeModal}
         footer={
           <>
-            <Button title="Cancel" variant="ghost" onPress={closeModal} disabled={saving} />
-            <Button title={editing ? 'Save Changes' : 'Save'} onPress={handleSave} loading={saving} />
+            <Button title="Cancel" variant="secondary" onPress={closeModal} disabled={saving} />
+            <Button title={editing ? 'Save changes' : 'Save employee'} onPress={handleSave} loading={saving} />
           </>
         }
       >
         <Input
-          label="Name"
+          label="Full name"
+          variant="dialog"
           value={form.name}
           onChangeText={setField('name')}
-          placeholder="e.g. Somchai Jaidee"
+          placeholder="e.g. Chanida Wongsakul"
           error={errors.name}
           editable={!saving}
         />
         <Input
           label="Position"
+          variant="dialog"
           value={form.position}
           onChangeText={setField('position')}
-          placeholder="e.g. Software Engineer"
+          placeholder="e.g. Payroll Coordinator"
           error={errors.position}
           editable={!saving}
         />
         <Input
-          label="Salary (THB)"
+          label="Monthly salary"
+          variant="dialog"
+          prefix="฿"
           value={form.salary}
           onChangeText={setField('salary')}
-          placeholder="e.g. 45000"
+          placeholder="0"
           keyboardType="numeric"
           inputMode="decimal"
+          style={styles.alignRight}
           error={errors.salary}
           editable={!saving}
           onSubmitEditing={handleSave}
@@ -511,29 +578,34 @@ export default function EmployeesScreen({ token, onError, onAnalyze, analyzing, 
 
       <AppModal
         visible={rangeOpen}
-        title="Custom salary range"
+        eyebrow="Filter"
+        title="Salary range"
         onClose={() => setRangeOpen(false)}
         footer={
           <>
-            <Button title="Cancel" variant="ghost" onPress={() => setRangeOpen(false)} />
+            <Button title="Cancel" variant="secondary" onPress={() => setRangeOpen(false)} />
             <Button title="Apply" onPress={applyRange} />
           </>
         }
       >
         <Input
-          label="Minimum salary (THB)"
+          label="Minimum salary"
+          variant="dialog"
+          prefix="฿"
           value={range.min}
           onChangeText={(v) => setRange((r) => ({ ...r, min: v }))}
-          placeholder="e.g. 20000 (leave empty for no minimum)"
+          placeholder="No minimum"
           keyboardType="numeric"
           inputMode="decimal"
           error={rangeErrors.min}
         />
         <Input
-          label="Maximum salary (THB)"
+          label="Maximum salary"
+          variant="dialog"
+          prefix="฿"
           value={range.max}
           onChangeText={(v) => setRange((r) => ({ ...r, max: v }))}
-          placeholder="e.g. 50000 (leave empty for no maximum)"
+          placeholder="No maximum"
           keyboardType="numeric"
           inputMode="decimal"
           error={rangeErrors.max}
@@ -545,98 +617,90 @@ export default function EmployeesScreen({ token, onError, onAnalyze, analyzing, 
 }
 
 const styles = StyleSheet.create({
-  content: { padding: spacing.lg, paddingBottom: spacing.xxl, width: '100%', maxWidth: MAX_WIDTH, alignSelf: 'center' },
-  stats: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.lg },
+  content: { paddingTop: spacing.s10, paddingBottom: spacing.s10, width: '100%', maxWidth: MAX_WIDTH + 96, alignSelf: 'center' },
+  baht: { color: colors.muted, fontFamily: fonts.sans },
+  alignRight: { textAlign: 'right' },
 
-  toolbar: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, marginBottom: spacing.md },
-  filters: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.lg },
-  clearAll: { fontSize: 13, fontWeight: '600', color: colors.primary, textDecorationLine: 'underline', marginLeft: spacing.xs },
-  count: { fontSize: 13, color: colors.textMuted, marginTop: -spacing.sm, marginBottom: spacing.md },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingBottom: spacing.s6,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.ink,
+  },
+
+  stats: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: colors.hairline, marginBottom: spacing.s8 },
+  stat: { flex: 1, paddingVertical: spacing.s7 },
+  statDivider: { borderLeftWidth: 1, borderLeftColor: colors.hairline },
+  statValue: { marginTop: spacing.s2, marginBottom: spacing.s2 },
+
+  toolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.s4 },
   toolbarNarrow: { flexDirection: 'column', alignItems: 'stretch', gap: 0 },
-  search: { flex: 1, marginBottom: 0 },
-  searchNarrow: { marginBottom: spacing.md },
-  toolbarButtons: { flexDirection: 'row', gap: spacing.sm },
-  toolbarButtonsStack: { flexDirection: 'column', alignItems: 'stretch' },
-  flexBtn: { flex: 1 },
-  clear: { fontSize: 20, lineHeight: 20, color: colors.textMuted, paddingHorizontal: spacing.xs },
+  searchWide: { flex: 1, maxWidth: 480, marginBottom: 0 },
+  searchNarrow: { marginBottom: spacing.s3 },
+  toolbarButtons: { flexDirection: 'row', gap: spacing.s3 },
+  stack: { flexDirection: 'column' },
+  flex: { flex: 1, paddingHorizontal: spacing.s3 },
+  clearX: { fontSize: 20, lineHeight: 20, color: colors.muted, paddingHorizontal: spacing.s1 },
 
-  searchIcon: { width: 16, height: 16, marginRight: spacing.sm },
-  searchCircle: { width: 11, height: 11, borderRadius: 6, borderWidth: 2, borderColor: colors.textMuted },
+  searchIcon: { width: 16, height: 16, marginRight: spacing.s3 },
+  searchCircle: { width: 11, height: 11, borderRadius: 6, borderWidth: 1.5, borderColor: colors.inkSoft },
   searchHandle: {
     position: 'absolute',
-    width: 2,
+    width: 1.5,
     height: 6,
-    backgroundColor: colors.textMuted,
+    backgroundColor: colors.inkSoft,
     left: 11,
     top: 9,
     transform: [{ rotate: '-45deg' }],
   },
 
+  filters: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: spacing.s2,
+    marginTop: spacing.s4,
+    marginBottom: spacing.s6,
+  },
+
   tableHead: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderTopLeftRadius: radius.card,
-    borderTopRightRadius: radius.card,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.ink,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.hairline,
+    paddingVertical: spacing.s4,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
+    paddingVertical: spacing.s5,
     borderBottomWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    borderBottomColor: colors.hairlineSoft,
   },
-  rowAlt: { backgroundColor: colors.surfaceAlt },
-  rowLast: { borderBottomLeftRadius: radius.card, borderBottomRightRadius: radius.card },
-  cell: { fontSize: 14, color: colors.text, paddingRight: spacing.md },
-  strong: { fontWeight: '600' },
-  colName: { flex: 2.2 },
-  colPos: { flex: 2 },
-  colStatus: { flex: 1.3 },
-  colSalary: { flex: 1.4, textAlign: 'right', paddingRight: spacing.xl },
-  colActions: { flex: 3.2 },
-  link: { color: colors.primary },
+  colNo: { width: 52 },
+  colName: { flex: 2.4, paddingRight: spacing.s4 },
+  colPos: { flex: 2.2, paddingRight: spacing.s4 },
+  colStatus: { flex: 1.4 },
+  colSalary: { flex: 1.3, textAlign: 'right' },
+  colActions: { flex: 2.4 },
   right: { textAlign: 'right' },
-  actions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm },
+  actions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' },
+  actionsLeft: { justifyContent: 'flex-start' },
+  vr: { width: 1, height: 14, backgroundColor: colors.hairline, marginHorizontal: spacing.s3 },
 
-  mCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.lg,
-    marginBottom: spacing.md,
-    ...shadow,
-  },
-  mTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  mBottom: {
+  mRow: { paddingVertical: spacing.s5, borderBottomWidth: 1, borderBottomColor: colors.hairlineSoft },
+  mTop: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.s3 },
+  mRight: { alignItems: 'flex-end' },
+
+  footer: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
     justifyContent: 'space-between',
     flexWrap: 'wrap',
-    gap: spacing.md,
-    marginTop: spacing.md,
-    paddingTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+    gap: spacing.s2,
+    paddingTop: spacing.s5,
   },
-  mSalary: { fontSize: 16, fontWeight: '700', color: colors.text, marginTop: 2 },
-  muted: { fontSize: 13, color: colors.textMuted },
-
-  empty: {
-    alignItems: 'center',
-    padding: spacing.xxl,
-    backgroundColor: colors.surface,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
+  empty: { paddingVertical: spacing.s10, borderBottomWidth: 1, borderBottomColor: colors.hairline },
 });
