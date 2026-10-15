@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import { apiRequest } from '../api';
-import { confirmAsync } from '../alert';
+import { confirmAsync, showToast } from '../alert';
 import AppModal from '../components/AppModal';
 import Button from '../components/Button';
 import Input from '../components/Input';
@@ -20,6 +20,7 @@ import { colors, formatMoney, MAX_WIDTH, radius, shadow, spacing, type } from '.
 const SALARY_RE = /^\d+(\.\d{1,2})?$/;
 const EMPTY_FORM = { name: '', position: '', salary: '' };
 const WIDE = 768;
+const NARROW = 420;
 
 function SearchIcon() {
   return (
@@ -48,6 +49,7 @@ function validate(form) {
 export default function EmployeesScreen({ token, onError, onAnalyze, analyzing, onDataChanged }) {
   const { width } = useWindowDimensions();
   const wide = width >= WIDE;
+  const veryNarrow = width < NARROW;
 
   const [employees, setEmployees] = useState([]);
   const [stats, setStats] = useState({ total: 0, active: 0, leave: 0 });
@@ -57,6 +59,7 @@ export default function EmployeesScreen({ token, onError, onAnalyze, analyzing, 
   const [busyId, setBusyId] = useState(null);
 
   const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState(null); // employee being edited, null = adding
   const [form, setForm] = useState(EMPTY_FORM);
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
@@ -89,6 +92,12 @@ export default function EmployeesScreen({ token, onError, onAnalyze, analyzing, 
 
   const refetch = useCallback(() => load(appliedSearch.current), [load]);
 
+  // Show error; on 404 the row is gone → refresh the list
+  const fail = (e, title) => {
+    onError(e, title);
+    if (e.status === 404) refetch();
+  };
+
   // Debounced search (300ms); initial load runs immediately
   useEffect(() => {
     const term = search.trim();
@@ -107,33 +116,49 @@ export default function EmployeesScreen({ token, onError, onAnalyze, analyzing, 
     if (busyId) return;
     setBusyId(id);
     try {
-      await apiRequest(`/employees/${encodeURIComponent(id)}/status`, { method: 'PUT', token });
+      const res = await apiRequest(`/employees/${encodeURIComponent(id)}/status`, { method: 'PUT', token });
       await refetch();
+      showToast(`Status changed to ${res?.data?.status || 'updated'}`);
     } catch (e) {
-      onError(e, 'Update Failed');
+      fail(e, 'Update failed');
     } finally {
       setBusyId(null);
     }
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (item) => {
+    const { id } = item;
     if (busyId) return;
-    const ok = await confirmAsync('Delete employee', 'Are you sure?');
+    const ok = await confirmAsync(
+      `Delete "${item.name}"?`,
+      'This employee will be permanently removed from the database. This action cannot be undone.',
+      { confirmText: 'Delete', cancelText: 'Cancel', destructive: true }
+    );
     if (!ok) return;
     setBusyId(id);
     try {
       await apiRequest(`/employees/${encodeURIComponent(id)}`, { method: 'DELETE', token });
       onDataChanged();
       await refetch();
+      showToast('Employee deleted');
     } catch (e) {
-      onError(e, 'Delete Failed');
+      fail(e, 'Delete failed');
     } finally {
       setBusyId(null);
     }
   };
 
-  const openModal = () => {
+  const openAdd = () => {
+    setEditing(null);
     setForm(EMPTY_FORM);
+    setErrors({});
+    setModalOpen(true);
+  };
+
+  const openEdit = (item) => {
+    if (busyId) return;
+    setEditing(item);
+    setForm({ name: item.name, position: item.position, salary: String(item.salary) });
     setErrors({});
     setModalOpen(true);
   };
@@ -155,17 +180,21 @@ export default function EmployeesScreen({ token, onError, onAnalyze, analyzing, 
     if (Object.keys(errs).length) return;
     setSaving(true);
     try {
-      await apiRequest('/employees', {
-        method: 'POST',
-        token,
-        body: { name: form.name.trim(), position: form.position.trim(), salary: Number(form.salary.trim()) },
-      });
+      const body = { name: form.name.trim(), position: form.position.trim(), salary: Number(form.salary.trim()) };
+      if (editing) {
+        await apiRequest(`/employees/${encodeURIComponent(editing.id)}`, { method: 'PUT', token, body });
+      } else {
+        await apiRequest('/employees', { method: 'POST', token, body });
+      }
       setModalOpen(false);
       setForm(EMPTY_FORM);
       onDataChanged();
       await refetch();
+      showToast(editing ? 'Changes saved' : 'Employee added');
+      setEditing(null);
     } catch (e) {
-      onError(e, 'Save Failed');
+      if (e.status === 404) setModalOpen(false);
+      fail(e, 'Save failed');
     } finally {
       setSaving(false);
     }
@@ -177,6 +206,7 @@ export default function EmployeesScreen({ token, onError, onAnalyze, analyzing, 
     const busy = busyId === item.id;
     return (
       <View style={styles.actions}>
+        <Button title="Edit" variant="ghost" size="sm" onPress={() => openEdit(item)} disabled={!!busyId} />
         <Button
           title="Toggle Status"
           variant="secondary"
@@ -185,7 +215,7 @@ export default function EmployeesScreen({ token, onError, onAnalyze, analyzing, 
           loading={busy}
           disabled={!!busyId && !busy}
         />
-        <Button title="Delete" variant="danger" size="sm" onPress={() => handleDelete(item.id)} disabled={!!busyId} />
+        <Button title="Delete" variant="danger" size="sm" onPress={() => handleDelete(item)} disabled={!!busyId} />
       </View>
     );
   };
@@ -195,7 +225,9 @@ export default function EmployeesScreen({ token, onError, onAnalyze, analyzing, 
       const last = index === employees.length - 1;
       return (
         <View style={[styles.row, index % 2 === 1 && styles.rowAlt, last && styles.rowLast]}>
-          <Text style={[styles.cell, styles.colName, styles.strong]} numberOfLines={1}>{item.name}</Text>
+          <Pressable style={styles.colName} onPress={() => openEdit(item)}>
+            <Text style={[styles.cell, styles.strong, styles.link]} numberOfLines={1}>{item.name}</Text>
+          </Pressable>
           <Text style={[styles.cell, styles.colPos]} numberOfLines={1}>{item.position}</Text>
           <View style={styles.colStatus}><StatusBadge status={item.status} /></View>
           <Text style={[styles.cell, styles.colSalary, styles.strong]}>{formatMoney(item.salary)}</Text>
@@ -206,10 +238,10 @@ export default function EmployeesScreen({ token, onError, onAnalyze, analyzing, 
     return (
       <View style={styles.mCard}>
         <View style={styles.mTop}>
-          <View style={{ flex: 1 }}>
+          <Pressable style={{ flex: 1 }} onPress={() => openEdit(item)}>
             <Text style={[type.body, styles.strong]} numberOfLines={1}>{item.name}</Text>
             <Text style={styles.muted} numberOfLines={1}>{item.position}</Text>
-          </View>
+          </Pressable>
           <StatusBadge status={item.status} />
         </View>
         <View style={styles.mBottom}>
@@ -233,7 +265,7 @@ export default function EmployeesScreen({ token, onError, onAnalyze, analyzing, 
 
       <View style={[styles.toolbar, !wide && styles.toolbarNarrow]}>
         <Input
-          containerStyle={[styles.search, !wide && styles.searchNarrow]}
+          containerStyle={wide ? styles.search : styles.searchNarrow}
           value={search}
           onChangeText={setSearch}
           placeholder="Search by name or position"
@@ -250,15 +282,15 @@ export default function EmployeesScreen({ token, onError, onAnalyze, analyzing, 
             ) : null
           }
         />
-        <View style={styles.toolbarButtons}>
+        <View style={[styles.toolbarButtons, veryNarrow && styles.toolbarButtonsStack]}>
           <Button
             title="Analyze Salary Structure"
             variant="secondary"
             onPress={onAnalyze}
             loading={analyzing}
-            style={!wide && styles.flexBtn}
+            style={!wide && !veryNarrow && styles.flexBtn}
           />
-          <Button title="+ Add Employee" onPress={openModal} style={!wide && styles.flexBtn} />
+          <Button title="+ Add Employee" onPress={openAdd} style={!wide && !veryNarrow && styles.flexBtn} />
         </View>
       </View>
 
@@ -300,12 +332,12 @@ export default function EmployeesScreen({ token, onError, onAnalyze, analyzing, 
 
       <AppModal
         visible={modalOpen}
-        title="Add Employee"
+        title={editing ? 'Edit Employee' : 'Add Employee'}
         onClose={closeModal}
         footer={
           <>
             <Button title="Cancel" variant="ghost" onPress={closeModal} disabled={saving} />
-            <Button title="Save" onPress={handleSave} loading={saving} />
+            <Button title={editing ? 'Save Changes' : 'Save'} onPress={handleSave} loading={saving} />
           </>
         }
       >
@@ -348,8 +380,9 @@ const styles = StyleSheet.create({
   toolbar: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, marginBottom: spacing.lg },
   toolbarNarrow: { flexDirection: 'column', alignItems: 'stretch', gap: 0 },
   search: { flex: 1, marginBottom: 0 },
-  searchNarrow: { flex: 0, marginBottom: spacing.md },
+  searchNarrow: { marginBottom: spacing.md },
   toolbarButtons: { flexDirection: 'row', gap: spacing.sm },
+  toolbarButtonsStack: { flexDirection: 'column', alignItems: 'stretch' },
   flexBtn: { flex: 1 },
   clear: { fontSize: 20, lineHeight: 20, color: colors.textMuted, paddingHorizontal: spacing.xs },
 
@@ -395,7 +428,8 @@ const styles = StyleSheet.create({
   colPos: { flex: 2 },
   colStatus: { flex: 1.3 },
   colSalary: { flex: 1.4, textAlign: 'right', paddingRight: spacing.xl },
-  colActions: { flex: 2.4 },
+  colActions: { flex: 3.2 },
+  link: { color: colors.primary },
   right: { textAlign: 'right' },
   actions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm },
 

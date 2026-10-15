@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Platform, Pressable, StatusBar, StyleSheet, Text, View } from 'react-native';
 import { apiRequest } from '../api';
-import { showAlert } from '../alert';
+import { showAlert, showError } from '../alert';
 import Button from '../components/Button';
 import { colors, MAX_WIDTH, spacing } from '../theme';
 import EmployeesScreen from './EmployeesScreen';
@@ -25,11 +25,11 @@ export default function MainScreen({ token, onLogout }) {
   const handleError = useCallback(
     (e, title = 'Error') => {
       if (e.status === 401) {
-        showAlert('Session Expired', 'Please sign in again.');
+        showAlert('Session expired', 'Please sign in again.', { type: 'warning' });
         onLogout();
         return;
       }
-      showAlert(title, e.message);
+      showError(e, title);
     },
     [onLogout]
   );

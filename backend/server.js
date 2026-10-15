@@ -78,32 +78,47 @@ app.get('/api/employees/salary-clusters', asyncHandler(async (req, res) => {
   res.json({ success: true, clusters: salaryClusters(rows.map((r) => Number(r.Tharatap_salary)), 3) });
 }));
 
-app.post('/api/employees', asyncHandler(async (req, res) => {
-  const { name, position, salary } = req.body || {};
-  if (typeof name !== 'string' || !name.trim()) {
-    return res.status(400).json({ success: false, message: 'Name is required' });
-  }
-  if (typeof position !== 'string' || !position.trim()) {
-    return res.status(400).json({ success: false, message: 'Position is required' });
-  }
+// Shared by POST and PUT /:id → { error } or { value: {name, position, salary} }
+function validateEmployee(body) {
+  const { name, position, salary } = body || {};
+  if (typeof name !== 'string' || !name.trim()) return { error: 'Name is required' };
+  if (typeof position !== 'string' || !position.trim()) return { error: 'Position is required' };
   if (name.trim().length > 100 || position.trim().length > 100) {
-    return res.status(400).json({ success: false, message: 'Name and position must be at most 100 characters' });
+    return { error: 'Name and position must be at most 100 characters' };
   }
   const isNumeric = typeof salary === 'number' || (typeof salary === 'string' && salary.trim() !== '');
   const sal = isNumeric ? Number(salary) : NaN;
-  if (!Number.isFinite(sal) || sal <= 0) {
-    return res.status(400).json({ success: false, message: 'Salary must be a number greater than 0' });
-  }
-  if (sal > MAX_SALARY) {
-    return res.status(400).json({ success: false, message: 'Salary is too large' });
-  }
+  if (!Number.isFinite(sal) || sal <= 0) return { error: 'Salary must be a number greater than 0' };
+  if (sal > MAX_SALARY) return { error: 'Salary is too large' };
+  return { value: { name: name.trim(), position: position.trim(), salary: Math.round(sal * 100) / 100 } };
+}
+
+app.post('/api/employees', asyncHandler(async (req, res) => {
+  const { error, value } = validateEmployee(req.body);
+  if (error) return res.status(400).json({ success: false, message: error });
 
   const [result] = await pool.execute(
     'INSERT INTO Tharatap_employees (Tharatap_name, Tharatap_position, Tharatap_salary) VALUES (?, ?, ?)',
-    [name.trim(), position.trim(), Math.round(sal * 100) / 100]
+    [value.name, value.position, value.salary]
   );
   const [rows] = await pool.execute(`SELECT ${SELECT_COLS} FROM Tharatap_employees WHERE Tharatap_id = ?`, [result.insertId]);
   res.status(201).json({ success: true, data: toEmployee(rows[0]) });
+}));
+
+app.put('/api/employees/:id', asyncHandler(async (req, res) => {
+  const id = parseId(req.params.id);
+  if (id === null) return res.status(404).json({ success: false, message: 'Employee not found' });
+  const { error, value } = validateEmployee(req.body);
+  if (error) return res.status(400).json({ success: false, message: error });
+
+  await pool.execute(
+    'UPDATE Tharatap_employees SET Tharatap_name = ?, Tharatap_position = ?, Tharatap_salary = ? WHERE Tharatap_id = ?',
+    [value.name, value.position, value.salary, id]
+  );
+  // affectedRows is 0 when values are unchanged, so check existence via SELECT
+  const [rows] = await pool.execute(`SELECT ${SELECT_COLS} FROM Tharatap_employees WHERE Tharatap_id = ?`, [id]);
+  if (!rows.length) return res.status(404).json({ success: false, message: 'Employee not found' });
+  res.json({ success: true, data: toEmployee(rows[0]) });
 }));
 
 app.put('/api/employees/:id/status', asyncHandler(async (req, res) => {

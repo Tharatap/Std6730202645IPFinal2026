@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
 import { apiRequest } from '../api';
-import { showAlert } from '../alert';
+import { describeError } from '../alert';
 import Button from '../components/Button';
 import Input from '../components/Input';
 import { colors, radius, shadow, spacing, type } from '../theme';
@@ -10,13 +10,20 @@ export default function LoginScreen({ onLogin }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [banner, setBanner] = useState(null); // { title, message }
 
   const handleLogin = async () => {
     if (loading) return;
-    if (!username.trim() || !password) {
-      showAlert('Validation Error', 'Please enter both username and password.');
+    const errs = {};
+    if (!username.trim()) errs.username = 'Please enter your username';
+    if (!password) errs.password = 'Please enter your password';
+    setFieldErrors(errs);
+    if (Object.keys(errs).length) {
+      setBanner({ title: 'Missing information', message: 'Please fill in both username and password.' });
       return;
     }
+    setBanner(null);
     setLoading(true);
     try {
       const data = await apiRequest('/login', {
@@ -26,9 +33,19 @@ export default function LoginScreen({ onLogin }) {
       if (!data?.token) throw new Error('Invalid response from server');
       onLogin(data.token);
     } catch (e) {
-      showAlert('Login Failed', e.message);
+      setBanner(
+        e.status === 401
+          ? { title: 'Incorrect username or password', message: 'Please check your credentials and try again.' }
+          : describeError(e, 'Sign in failed')
+      );
       setLoading(false);
     }
+  };
+
+  const change = (setter, key) => (v) => {
+    setter(v);
+    if (fieldErrors[key]) setFieldErrors((f) => ({ ...f, [key]: undefined }));
+    if (banner) setBanner(null);
   };
 
   return (
@@ -44,24 +61,38 @@ export default function LoginScreen({ onLogin }) {
         <Text style={[type.title, styles.center]}>HR Manager</Text>
         <Text style={styles.subtitle}>Salary Analytics System</Text>
 
+        {banner ? (
+          <View style={styles.banner} accessibilityRole="alert">
+            <View style={styles.bannerIcon}>
+              <Text style={styles.bannerIconText}>!</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.bannerTitle}>{banner.title}</Text>
+              {banner.message ? <Text style={styles.bannerMsg}>{banner.message}</Text> : null}
+            </View>
+          </View>
+        ) : null}
+
         <Input
           label="Username"
           value={username}
-          onChangeText={setUsername}
+          onChangeText={change(setUsername, 'username')}
           placeholder="Enter your username"
           autoCapitalize="none"
           autoCorrect={false}
           editable={!loading}
+          error={fieldErrors.username}
         />
         <Input
           label="Password"
           value={password}
-          onChangeText={setPassword}
+          onChangeText={change(setPassword, 'password')}
           placeholder="Enter your password"
           secureTextEntry
           autoCapitalize="none"
           editable={!loading}
           onSubmitEditing={handleLogin}
+          error={fieldErrors.password}
         />
         <Button title="Sign In" onPress={handleLogin} loading={loading} style={styles.button} />
       </View>
@@ -109,6 +140,29 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
     marginBottom: spacing.xl,
   },
+  banner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: colors.dangerBg,
+    borderRadius: radius.control,
+    borderLeftWidth: 4,
+    borderLeftColor: colors.danger,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  bannerIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: colors.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.sm,
+    marginTop: 1,
+  },
+  bannerIconText: { color: colors.textInverse, fontSize: 12, fontWeight: '800' },
+  bannerTitle: { fontSize: 14, fontWeight: '600', color: colors.danger },
+  bannerMsg: { fontSize: 13, color: colors.text, marginTop: 2 },
   button: { marginTop: spacing.sm },
   footer: { fontSize: 12, color: colors.textMuted, marginTop: spacing.xl },
 });

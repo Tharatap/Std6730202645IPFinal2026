@@ -5,6 +5,7 @@ const VARIANTS = {
   primary: { bg: colors.primary, pressed: colors.primaryLight, fg: colors.textInverse, border: colors.primary },
   secondary: { bg: colors.secondaryBg, pressed: colors.border, fg: colors.primary, border: colors.secondaryBg },
   danger: { bg: colors.dangerBg, pressed: colors.dangerPressed, fg: colors.danger, border: colors.dangerBg },
+  dangerSolid: { bg: colors.danger, pressed: colors.dangerDark, fg: colors.textInverse, border: colors.danger },
   ghost: { bg: 'transparent', pressed: colors.ghostPressed, fg: colors.primary, border: colors.border },
 };
 

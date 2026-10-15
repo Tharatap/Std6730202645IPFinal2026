@@ -18,6 +18,7 @@ export const colors = {
   warningBg: '#FEF3C7',
   danger: '#B91C1C',
   dangerBg: '#FEE2E2',
+  dangerDark: '#991B1B',
   secondaryBg: '#EEF2F7',
   overlay: 'rgba(15,23,42,0.45)',
   placeholder: '#94A3B8',
