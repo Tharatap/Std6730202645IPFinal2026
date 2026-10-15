@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Platform, Pressable, StatusBar, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { apiRequest } from '../api';
 import { showAlert, showError } from '../alert';
@@ -22,6 +22,7 @@ export default function MainScreen({ token, onLogout }) {
   const [tab, setTab] = useState('employees');
   const [analysis, setAnalysis] = useState(null); // { clusters, employees, at }
   const [analyzing, setAnalyzing] = useState(false);
+  const [analysisFailed, setAnalysisFailed] = useState(false);
 
   // Any 401 → logout; other errors → dialog
   const handleError = useCallback(
@@ -40,6 +41,7 @@ export default function MainScreen({ token, onLogout }) {
     setTab('analytics');
     if (analyzing) return;
     setAnalyzing(true);
+    setAnalysisFailed(false);
     try {
       const [clusterRes, empRes] = await Promise.all([
         apiRequest('/employees/salary-clusters', { token }),
@@ -51,13 +53,22 @@ export default function MainScreen({ token, onLogout }) {
         at: new Date(),
       });
     } catch (e) {
+      setAnalysisFailed(true);
       handleError(e, 'Analysis failed');
     } finally {
       setAnalyzing(false);
     }
   }, [token, analyzing, handleError]);
 
-  const clearAnalysis = useCallback(() => setAnalysis(null), []);
+  const clearAnalysis = useCallback(() => {
+    setAnalysis(null);
+    setAnalysisFailed(false);
+  }, []);
+
+  // Opening Analytics with no result runs the analysis automatically (once; a failure waits for "Try again")
+  useEffect(() => {
+    if (tab === 'analytics' && !analysis && !analyzing && !analysisFailed) analyze();
+  }, [tab, analysis, analyzing, analysisFailed, analyze]);
 
   const tabs = (
     <View style={wide ? styles.topTabs : styles.bottomTabs}>
@@ -122,7 +133,7 @@ export default function MainScreen({ token, onLogout }) {
           />
         </View>
         <View style={[styles.page, tab !== 'analytics' && styles.hidden]}>
-          <AnalyticsScreen analysis={analysis} analyzing={analyzing} onAnalyze={analyze} />
+          <AnalyticsScreen analysis={analysis} analyzing={analyzing} failed={analysisFailed} onAnalyze={analyze} />
         </View>
       </View>
 

@@ -102,7 +102,7 @@ function Loading({ wide }) {
   );
 }
 
-export default function AnalyticsScreen({ analysis, analyzing, onAnalyze }) {
+export default function AnalyticsScreen({ analysis, analyzing, failed, onAnalyze }) {
   const { width } = useWindowDimensions();
   const wide = width >= WIDE;
   const clusters = analysis?.clusters || [];
@@ -115,11 +115,21 @@ export default function AnalyticsScreen({ analysis, analyzing, onAnalyze }) {
   } else if (!analysis) {
     content = (
       <View style={styles.block}>
-        <Text style={type.label}>Not yet analyzed</Text>
-        <Text style={[wide ? type.dialog : type.section, { marginTop: spacing.s2 }]}>No analysis yet.</Text>
-        <Text style={[type.body, { marginTop: spacing.s3, maxWidth: 520 }]}>
-          Run “Analyze Salary Structure” to group every employee into salary tiers.
+        <Text style={[type.label, failed && { color: colors.danger }]}>{failed ? 'Analysis failed' : 'Not yet analyzed'}</Text>
+        <Text style={[wide ? type.dialog : type.section, { marginTop: spacing.s2 }]}>
+          {failed ? "Couldn't load the analysis." : 'No analysis yet.'}
         </Text>
+        <Text style={[type.body, { marginTop: spacing.s3, maxWidth: 520 }]}>
+          {failed
+            ? 'Check your connection or make sure the server is running, then try again.'
+            : 'Run the analysis to group every employee into salary tiers.'}
+        </Text>
+        <Button
+          title={failed ? 'Try again' : 'Analyze Salary Structure'}
+          variant="secondary"
+          onPress={onAnalyze}
+          style={{ marginTop: spacing.s6, alignSelf: 'flex-start' }}
+        />
       </View>
     );
   } else if (clusters.length === 0 || employees.length === 0) {
