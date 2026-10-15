@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import LoginScreen from './src/screens/LoginScreen';
-import DashboardScreen from './src/screens/DashboardScreen';
+import MainScreen from './src/screens/MainScreen';
 
 export default function App() {
   const [token, setToken] = useState(null);
@@ -10,7 +10,7 @@ export default function App() {
     <>
       <StatusBar style={token ? 'light' : 'dark'} />
       {token ? (
-        <DashboardScreen token={token} onLogout={() => setToken(null)} />
+        <MainScreen token={token} onLogout={() => setToken(null)} />
       ) : (
         <LoginScreen onLogin={setToken} />
       )}

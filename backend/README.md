@@ -24,6 +24,7 @@ npm start                 # node server.js
 | GET | `/api/health` | – | `200 {ok:true}` |
 | POST | `/api/login` | `{username,password}` | `200 {success:true,token:"mock-jwt-token"}` / `401 {success:false,message:"Invalid username or password"}` |
 | GET | `/api/employees` | – | `200 {success:true,data:[{id,name,position,status,salary}]}` |
+| GET | `/api/employees?search=<text>` | – | ค้นหาจากชื่อหรือตำแหน่ง (LIKE, ไม่สนตัวพิมพ์เล็ก/ใหญ่) — ค่าว่างจะคืนทั้งหมด, รูปแบบ response เหมือนด้านบน |
 | POST | `/api/employees` | `{name,position,salary}` | `201 {success:true,data:employee}` / `400` ข้อมูลไม่ถูกต้อง |
 | PUT | `/api/employees/:id/status` | – | สลับ `Active` ⇄ `On Leave` → `200 {success:true,data:employee}` / `404` |
 | DELETE | `/api/employees/:id` | – | `200 {success:true,message}` / `404` |

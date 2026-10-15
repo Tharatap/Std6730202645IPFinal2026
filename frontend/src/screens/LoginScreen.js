@@ -1,17 +1,10 @@
 import { useState } from 'react';
-import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
 import { apiRequest } from '../api';
 import { showAlert } from '../alert';
-import { colors, shadow } from '../theme';
+import Button from '../components/Button';
+import Input from '../components/Input';
+import { colors, radius, shadow, spacing, type } from '../theme';
 
 export default function LoginScreen({ onLogin }) {
   const [username, setUsername] = useState('');
@@ -44,53 +37,35 @@ export default function LoginScreen({ onLogin }) {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={styles.card}>
-        <View style={styles.logo}>
-          <Text style={styles.logoText}>HR</Text>
+        <View style={styles.brand}>
+          <Text style={styles.brandText}>HR</Text>
+          <View style={styles.brandAccent} />
         </View>
-        <Text style={styles.title}>HR Manager</Text>
+        <Text style={[type.title, styles.center]}>HR Manager</Text>
         <Text style={styles.subtitle}>Salary Analytics System</Text>
 
-        <Text style={styles.label}>Username</Text>
-        <TextInput
-          style={styles.input}
+        <Input
+          label="Username"
           value={username}
           onChangeText={setUsername}
-          placeholder="Enter username"
-          placeholderTextColor="#9CA3AF"
+          placeholder="Enter your username"
           autoCapitalize="none"
           autoCorrect={false}
           editable={!loading}
         />
-
-        <Text style={styles.label}>Password</Text>
-        <TextInput
-          style={styles.input}
+        <Input
+          label="Password"
           value={password}
           onChangeText={setPassword}
-          placeholder="Enter password"
-          placeholderTextColor="#9CA3AF"
+          placeholder="Enter your password"
           secureTextEntry
           autoCapitalize="none"
           editable={!loading}
           onSubmitEditing={handleLogin}
         />
-
-        <Pressable
-          style={({ pressed }) => [
-            styles.button,
-            pressed && styles.buttonPressed,
-            loading && styles.buttonDisabled,
-          ]}
-          onPress={handleLogin}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>Login</Text>
-          )}
-        </Pressable>
+        <Button title="Sign In" onPress={handleLogin} loading={loading} style={styles.button} />
       </View>
+      <Text style={styles.footer}>© 2026 HR Manager · Internal use only</Text>
     </KeyboardAvoidingView>
   );
 }
@@ -101,49 +76,39 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
+    padding: spacing.lg,
   },
   card: {
     width: '100%',
     maxWidth: 400,
-    backgroundColor: colors.card,
-    borderRadius: 20,
-    padding: 28,
+    backgroundColor: colors.surface,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.xxl,
     ...shadow,
   },
-  logo: {
-    width: 64,
-    height: 64,
-    borderRadius: 18,
+  brand: {
+    width: 56,
+    height: 56,
+    borderRadius: radius.card,
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     alignSelf: 'center',
-    marginBottom: 16,
+    marginBottom: spacing.lg,
+    overflow: 'hidden',
   },
-  logoText: { color: '#fff', fontSize: 24, fontWeight: '800' },
-  title: { fontSize: 26, fontWeight: '800', color: colors.text, textAlign: 'center' },
-  subtitle: { fontSize: 14, color: colors.muted, textAlign: 'center', marginTop: 4, marginBottom: 24 },
-  label: { fontSize: 13, fontWeight: '600', color: colors.text, marginBottom: 6 },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: colors.text,
-    backgroundColor: '#F9FAFB',
-    marginBottom: 16,
+  brandText: { color: colors.textInverse, fontSize: 20, fontWeight: '700', letterSpacing: 1 },
+  brandAccent: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 4, backgroundColor: colors.accent },
+  center: { textAlign: 'center' },
+  subtitle: {
+    fontSize: 14,
+    color: colors.textMuted,
+    textAlign: 'center',
+    marginTop: spacing.xs,
+    marginBottom: spacing.xl,
   },
-  button: {
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  buttonPressed: { backgroundColor: colors.primaryDark },
-  buttonDisabled: { opacity: 0.6 },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  button: { marginTop: spacing.sm },
+  footer: { fontSize: 12, color: colors.textMuted, marginTop: spacing.xl },
 });

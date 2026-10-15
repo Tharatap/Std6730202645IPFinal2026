@@ -55,7 +55,20 @@ app.post('/api/login', (req, res) => {
 app.use('/api/employees', requireAuth);
 
 app.get('/api/employees', asyncHandler(async (req, res) => {
-  const [rows] = await pool.execute(`SELECT ${SELECT_COLS} FROM Tharatap_employees ORDER BY Tharatap_id ASC`);
+  const raw = typeof req.query.search === 'string' ? req.query.search.trim() : '';
+  let rows;
+  if (raw) {
+    // Escape LIKE wildcards so user input is matched literally
+    const term = raw.slice(0, 100).replace(/[\\%_]/g, '\\$&');
+    [rows] = await pool.execute(
+      `SELECT ${SELECT_COLS} FROM Tharatap_employees
+       WHERE Tharatap_name LIKE CONCAT('%', ?, '%') OR Tharatap_position LIKE CONCAT('%', ?, '%')
+       ORDER BY Tharatap_id ASC`,
+      [term, term]
+    );
+  } else {
+    [rows] = await pool.execute(`SELECT ${SELECT_COLS} FROM Tharatap_employees ORDER BY Tharatap_id ASC`);
+  }
   res.json({ success: true, data: rows.map(toEmployee) });
 }));
 
