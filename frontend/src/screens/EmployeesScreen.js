@@ -12,6 +12,7 @@ import { apiRequest } from '../api';
 import { confirmAsync, showToast } from '../alert';
 import AppModal from '../components/AppModal';
 import Button from '../components/Button';
+import Dropdown from '../components/Dropdown';
 import Input from '../components/Input';
 import StatCard from '../components/StatCard';
 import StatusBadge from '../components/StatusBadge';
@@ -19,6 +20,45 @@ import { colors, formatMoney, MAX_WIDTH, radius, shadow, spacing, type } from '.
 
 const SALARY_RE = /^\d+(\.\d{1,2})?$/;
 const EMPTY_FORM = { name: '', position: '', salary: '' };
+const AMOUNT_RE = /^\d+(\.\d{1,2})?$/;
+
+const STATUS_OPTIONS = [
+  { label: 'All statuses', value: '' },
+  { label: 'Active', value: 'Active' },
+  { label: 'On Leave', value: 'On Leave' },
+];
+
+// Non-overlapping, inclusive ranges
+const SALARY_PRESETS = {
+  any: { label: 'Any salary', min: null, max: null },
+  lt20: { label: 'Under ฿20,000', min: null, max: 19999.99 },
+  '20to50': { label: '฿20,000 – ฿49,999', min: 20000, max: 49999.99 },
+  '50to100': { label: '฿50,000 – ฿99,999', min: 50000, max: 99999.99 },
+  gte100: { label: '฿100,000 and above', min: 100000, max: null },
+};
+const SALARY_OPTIONS = [
+  ...Object.entries(SALARY_PRESETS).map(([value, p]) => ({ label: p.label, value })),
+  { label: 'Custom range…', value: 'custom' },
+];
+const NO_FILTERS = { position: '', status: '', salary: { key: 'any', min: null, max: null } };
+
+const fmt = (n) => `฿${Number(n).toLocaleString('en-US')}`;
+const salaryLabel = (s) => {
+  if (s.key !== 'custom') return SALARY_PRESETS[s.key].label;
+  if (s.min !== null && s.max !== null) return `${fmt(s.min)} – ${fmt(s.max)}`;
+  if (s.min !== null) return `${fmt(s.min)} and above`;
+  return `Up to ${fmt(s.max)}`;
+};
+
+function buildQuery(q) {
+  const params = [];
+  if (q.search) params.push(`search=${encodeURIComponent(q.search)}`);
+  if (q.position) params.push(`position=${encodeURIComponent(q.position)}`);
+  if (q.status) params.push(`status=${encodeURIComponent(q.status)}`);
+  if (q.salary.min !== null) params.push(`minSalary=${q.salary.min}`);
+  if (q.salary.max !== null) params.push(`maxSalary=${q.salary.max}`);
+  return params.length ? `?${params.join('&')}` : '';
+}
 const WIDE = 768;
 const NARROW = 420;
 
@@ -56,6 +96,11 @@ export default function EmployeesScreen({ token, onError, onAnalyze, analyzing, 
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [searching, setSearching] = useState(false);
+  const [filters, setFilters] = useState(NO_FILTERS);
+  const [positions, setPositions] = useState([]);
+  const [rangeOpen, setRangeOpen] = useState(false);
+  const [range, setRange] = useState({ min: '', max: '' });
+  const [rangeErrors, setRangeErrors] = useState({});
   const [busyId, setBusyId] = useState(null);
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -64,24 +109,27 @@ export default function EmployeesScreen({ token, onError, onAnalyze, analyzing, 
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
 
-  const appliedSearch = useRef('');
+  const appliedQuery = useRef({ search: '', ...NO_FILTERS });
+  const prevSearch = useRef('');
   const requestId = useRef(0);
   const firstLoad = useRef(true);
 
   // Loads the (filtered) list plus unfiltered stats; ignores stale responses
   const load = useCallback(
-    async (term) => {
+    async (query) => {
       const id = ++requestId.current;
       try {
-        const listReq = apiRequest(`/employees${term ? `?search=${encodeURIComponent(term)}` : ''}`, { token });
-        const allReq = term ? apiRequest('/employees', { token }) : listReq;
+        const qs = buildQuery(query);
+        const listReq = apiRequest(`/employees${qs}`, { token });
+        const allReq = qs ? apiRequest('/employees', { token }) : listReq;
         const [listRes, allRes] = await Promise.all([listReq, allReq]);
         if (id !== requestId.current) return;
         const list = Array.isArray(listRes?.data) ? listRes.data : [];
         const all = Array.isArray(allRes?.data) ? allRes.data : [];
         const active = all.filter((e) => e.status === 'Active').length;
-        appliedSearch.current = term;
+        appliedQuery.current = query;
         setEmployees(list);
+        setPositions([...new Set(all.map((e) => e.position))].sort((a, b) => a.localeCompare(b)));
         setStats({ total: all.length, active, leave: all.length - active });
       } catch (e) {
         if (id === requestId.current) onError(e, 'Load Failed');
@@ -90,7 +138,7 @@ export default function EmployeesScreen({ token, onError, onAnalyze, analyzing, 
     [token, onError]
   );
 
-  const refetch = useCallback(() => load(appliedSearch.current), [load]);
+  const refetch = useCallback(() => load(appliedQuery.current), [load]);
 
   // Show error; on 404 the row is gone → refresh the list
   const fail = (e, title) => {
@@ -98,19 +146,57 @@ export default function EmployeesScreen({ token, onError, onAnalyze, analyzing, 
     if (e.status === 404) refetch();
   };
 
-  // Debounced search (300ms); initial load runs immediately
+  // Search text is debounced (300ms); filter changes and the initial load apply immediately
   useEffect(() => {
     const term = search.trim();
-    const delay = firstLoad.current ? 0 : 300;
+    const typed = term !== prevSearch.current;
+    prevSearch.current = term;
+    const delay = firstLoad.current || !typed ? 0 : 300;
     if (!firstLoad.current) setSearching(true);
     const timer = setTimeout(async () => {
-      await load(term);
+      await load({ search: term, ...filters });
       firstLoad.current = false;
       setLoading(false);
       setSearching(false);
     }, delay);
     return () => clearTimeout(timer);
-  }, [search, load]);
+  }, [search, filters, load]);
+
+  const setFilter = (key, value) => setFilters((f) => ({ ...f, [key]: value }));
+
+  const selectSalary = (key) => {
+    if (key === 'custom') {
+      const s = filters.salary;
+      setRange({ min: s.min !== null ? String(s.min) : '', max: s.max !== null ? String(s.max) : '' });
+      setRangeErrors({});
+      setRangeOpen(true);
+      return;
+    }
+    setFilter('salary', { key, min: SALARY_PRESETS[key].min, max: SALARY_PRESETS[key].max });
+  };
+
+  const applyRange = () => {
+    const min = range.min.trim();
+    const max = range.max.trim();
+    const errs = {};
+    if (!min && !max) errs.min = 'Enter a minimum, a maximum, or both';
+    if (min && !AMOUNT_RE.test(min)) errs.min = 'Minimum must be a number of 0 or more';
+    if (max && !AMOUNT_RE.test(max)) errs.max = 'Maximum must be a number of 0 or more';
+    if (!errs.min && !errs.max && min && max && Number(min) > Number(max)) {
+      errs.max = 'Maximum must be greater than or equal to minimum';
+    }
+    setRangeErrors(errs);
+    if (Object.keys(errs).length) return;
+    setFilter('salary', { key: 'custom', min: min ? Number(min) : null, max: max ? Number(max) : null });
+    setRangeOpen(false);
+  };
+
+  const clearFilters = () => {
+    setSearch('');
+    setFilters(NO_FILTERS);
+  };
+
+  const hasFilters = !!(filters.position || filters.status || filters.salary.key !== 'any');
 
   const handleToggle = async (id) => {
     if (busyId) return;
@@ -294,6 +380,46 @@ export default function EmployeesScreen({ token, onError, onAnalyze, analyzing, 
         </View>
       </View>
 
+      <View style={styles.filters}>
+        <Dropdown
+          title="Position"
+          label={filters.position ? `Position: ${filters.position}` : 'Position'}
+          active={!!filters.position}
+          value={filters.position}
+          options={[{ label: 'All positions', value: '' }, ...positions.map((p) => ({ label: p, value: p }))]}
+          onSelect={(v) => setFilter('position', v)}
+          onClear={() => setFilter('position', '')}
+        />
+        <Dropdown
+          title="Status"
+          label={filters.status ? `Status: ${filters.status}` : 'Status'}
+          active={!!filters.status}
+          value={filters.status}
+          options={STATUS_OPTIONS}
+          onSelect={(v) => setFilter('status', v)}
+          onClear={() => setFilter('status', '')}
+        />
+        <Dropdown
+          title="Salary range"
+          label={filters.salary.key !== 'any' ? `Salary: ${salaryLabel(filters.salary)}` : 'Salary'}
+          active={filters.salary.key !== 'any'}
+          value={filters.salary.key}
+          options={SALARY_OPTIONS}
+          onSelect={selectSalary}
+          onClear={() => setFilter('salary', NO_FILTERS.salary)}
+        />
+        {hasFilters || term ? (
+          <Pressable onPress={clearFilters} hitSlop={6}>
+            <Text style={styles.clearAll}>Clear filters</Text>
+          </Pressable>
+        ) : null}
+      </View>
+      {!loading && (hasFilters || term) ? (
+        <Text style={styles.count}>
+          Showing {employees.length} of {stats.total} employees
+        </Text>
+      ) : null}
+
       {wide && employees.length > 0 ? (
         <View style={styles.tableHead}>
           <Text style={[type.caption, styles.colName]}>Name</Text>
@@ -310,10 +436,23 @@ export default function EmployeesScreen({ token, onError, onAnalyze, analyzing, 
     <ActivityIndicator style={{ marginTop: spacing.xxl }} size="large" color={colors.primary} />
   ) : (
     <View style={styles.empty}>
-      <Text style={type.section}>No employees found</Text>
-      <Text style={[styles.muted, { marginTop: spacing.xs }]}>
-        {term ? `No results for "${term}". Try a different keyword.` : 'Add your first employee to get started.'}
+      <Text style={type.section}>
+        {hasFilters ? 'No employees match these filters' : 'No employees found'}
       </Text>
+      <Text style={[styles.muted, { marginTop: spacing.xs, textAlign: 'center' }]}>
+        {hasFilters || term
+          ? 'Try a different keyword or adjust the filters.'
+          : 'Add your first employee to get started.'}
+      </Text>
+      {hasFilters || term ? (
+        <Button
+          title="Clear filters"
+          variant="secondary"
+          size="sm"
+          onPress={clearFilters}
+          style={{ marginTop: spacing.md }}
+        />
+      ) : null}
     </View>
   );
 
@@ -369,6 +508,38 @@ export default function EmployeesScreen({ token, onError, onAnalyze, analyzing, 
           onSubmitEditing={handleSave}
         />
       </AppModal>
+
+      <AppModal
+        visible={rangeOpen}
+        title="Custom salary range"
+        onClose={() => setRangeOpen(false)}
+        footer={
+          <>
+            <Button title="Cancel" variant="ghost" onPress={() => setRangeOpen(false)} />
+            <Button title="Apply" onPress={applyRange} />
+          </>
+        }
+      >
+        <Input
+          label="Minimum salary (THB)"
+          value={range.min}
+          onChangeText={(v) => setRange((r) => ({ ...r, min: v }))}
+          placeholder="e.g. 20000 (leave empty for no minimum)"
+          keyboardType="numeric"
+          inputMode="decimal"
+          error={rangeErrors.min}
+        />
+        <Input
+          label="Maximum salary (THB)"
+          value={range.max}
+          onChangeText={(v) => setRange((r) => ({ ...r, max: v }))}
+          placeholder="e.g. 50000 (leave empty for no maximum)"
+          keyboardType="numeric"
+          inputMode="decimal"
+          error={rangeErrors.max}
+          onSubmitEditing={applyRange}
+        />
+      </AppModal>
     </>
   );
 }
@@ -377,7 +548,10 @@ const styles = StyleSheet.create({
   content: { padding: spacing.lg, paddingBottom: spacing.xxl, width: '100%', maxWidth: MAX_WIDTH, alignSelf: 'center' },
   stats: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.lg },
 
-  toolbar: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, marginBottom: spacing.lg },
+  toolbar: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, marginBottom: spacing.md },
+  filters: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.lg },
+  clearAll: { fontSize: 13, fontWeight: '600', color: colors.primary, textDecorationLine: 'underline', marginLeft: spacing.xs },
+  count: { fontSize: 13, color: colors.textMuted, marginTop: -spacing.sm, marginBottom: spacing.md },
   toolbarNarrow: { flexDirection: 'column', alignItems: 'stretch', gap: 0 },
   search: { flex: 1, marginBottom: 0 },
   searchNarrow: { marginBottom: spacing.md },

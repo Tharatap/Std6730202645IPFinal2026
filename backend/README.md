@@ -24,7 +24,7 @@ npm start                 # node server.js
 | GET | `/api/health` | – | `200 {ok:true}` |
 | POST | `/api/login` | `{username,password}` | `200 {success:true,token:"mock-jwt-token"}` / `401 {success:false,message:"Invalid username or password"}` |
 | GET | `/api/employees` | – | `200 {success:true,data:[{id,name,position,status,salary}]}` |
-| GET | `/api/employees?search=<text>` | – | ค้นหาจากชื่อหรือตำแหน่ง (LIKE, ไม่สนตัวพิมพ์เล็ก/ใหญ่) — ค่าว่างจะคืนทั้งหมด, รูปแบบ response เหมือนด้านบน |
+| GET | `/api/employees?search=&position=&status=&minSalary=&maxSalary=` | – | ตัวกรองทั้งหมดไม่บังคับ ใช้ร่วมกันแบบ AND: `search` = ค้นชื่อหรือตำแหน่ง (LIKE), `position` = ตำแหน่งตรงตัว, `status` = `Active`/`On Leave`, `minSalary`/`maxSalary` = ช่วงเงินเดือน (รวมขอบ) — ค่าผิด (status ไม่ถูก, เงินไม่ใช่ตัวเลข ≥ 0, min > max) → `400`; response เหมือนด้านบน |
 | POST | `/api/employees` | `{name,position,salary}` | `201 {success:true,data:employee}` / `400` ข้อมูลไม่ถูกต้อง |
 | PUT | `/api/employees/:id` | `{name,position,salary}` | แก้ไขข้อมูล → `200 {success:true,data:employee}` / `400` ข้อมูลไม่ถูกต้อง / `404` |
 | PUT | `/api/employees/:id/status` | – | สลับ `Active` ⇄ `On Leave` → `200 {success:true,data:employee}` / `404` |

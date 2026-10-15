@@ -54,21 +54,65 @@ app.post('/api/login', (req, res) => {
 
 app.use('/api/employees', requireAuth);
 
+const STATUSES = ['Active', 'On Leave'];
+const AMOUNT_RE = /^\d+(\.\d+)?$/;
+const queryStr = (v) => (typeof v === 'string' ? v.trim() : '');
+
+// Optional filters (AND): search, position, status, minSalary, maxSalary
 app.get('/api/employees', asyncHandler(async (req, res) => {
-  const raw = typeof req.query.search === 'string' ? req.query.search.trim() : '';
-  let rows;
-  if (raw) {
+  const where = [];
+  const params = [];
+
+  const search = queryStr(req.query.search);
+  if (search) {
     // Escape LIKE wildcards so user input is matched literally
-    const term = raw.slice(0, 100).replace(/[\\%_]/g, '\\$&');
-    [rows] = await pool.execute(
-      `SELECT ${SELECT_COLS} FROM Tharatap_employees
-       WHERE Tharatap_name LIKE CONCAT('%', ?, '%') OR Tharatap_position LIKE CONCAT('%', ?, '%')
-       ORDER BY Tharatap_id ASC`,
-      [term, term]
-    );
-  } else {
-    [rows] = await pool.execute(`SELECT ${SELECT_COLS} FROM Tharatap_employees ORDER BY Tharatap_id ASC`);
+    const term = search.slice(0, 100).replace(/[\\%_]/g, '\\$&');
+    where.push("(Tharatap_name LIKE CONCAT('%', ?, '%') OR Tharatap_position LIKE CONCAT('%', ?, '%'))");
+    params.push(term, term);
   }
+
+  const position = queryStr(req.query.position);
+  if (position) {
+    where.push('Tharatap_position = ?');
+    params.push(position.slice(0, 100));
+  }
+
+  const status = queryStr(req.query.status);
+  if (status) {
+    if (!STATUSES.includes(status)) {
+      return res.status(400).json({ success: false, message: 'Status must be Active or On Leave' });
+    }
+    where.push('Tharatap_status = ?');
+    params.push(status);
+  }
+
+  const amounts = {};
+  for (const key of ['minSalary', 'maxSalary']) {
+    const raw = queryStr(req.query[key]);
+    if (!raw) continue;
+    if (!AMOUNT_RE.test(raw)) {
+      return res.status(400).json({ success: false, message: `${key} must be a number greater than or equal to 0` });
+    }
+    amounts[key] = Number(raw);
+  }
+  if (amounts.minSalary !== undefined && amounts.maxSalary !== undefined && amounts.minSalary > amounts.maxSalary) {
+    return res.status(400).json({ success: false, message: 'minSalary must be less than or equal to maxSalary' });
+  }
+  if (amounts.minSalary !== undefined) {
+    where.push('Tharatap_salary >= ?');
+    params.push(amounts.minSalary);
+  }
+  if (amounts.maxSalary !== undefined) {
+    where.push('Tharatap_salary <= ?');
+    params.push(amounts.maxSalary);
+  }
+
+  const [rows] = await pool.execute(
+    `SELECT ${SELECT_COLS} FROM Tharatap_employees
+     ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+     ORDER BY Tharatap_id ASC`,
+    params
+  );
   res.json({ success: true, data: rows.map(toEmployee) });
 }));
 
